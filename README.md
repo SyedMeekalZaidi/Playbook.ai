@@ -72,6 +72,7 @@
         -> uses mainly html, 
             - (react.js uses jsx + html)
 
+[more libs](https://github.com/jellydn/awesome-typesafe?tab=readme-ov-file)
 -------TESTING FRAMEWORKS--------
 1. Jest 
 2. Cypress
