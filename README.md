@@ -10,57 +10,57 @@
 ### Libs that might be helpful:
 ---------DIAGRAMMING LIBS----------
 1. BPMN.io
-    pros:
+    > pros:
         - focused on business process model and notation
         - open-source & free
         - lightweight
-    cons:
+    > cons:
         - limited support for non-bpmn diagrams
 
 2. GoJs
-    pros:
+    > pros:
         - lots of features for diagrams, process flows
         - high customization  --> lots of colours and anims
         - can handle large diagrams
-    cons:
+    > cons:
         - licensable
         - codebase and configs can be complex
 
 3. JointJS/ Rappid
-    pros:
+    > pros:
         - diagrams customization
         - supports bpmn
         - handles complex workflows
-    cons:
+    > cons:
         - steep learning curve
         - Rappid commercial - expensive
 
 -------- FRONTEND ----------
 1. React flow
-    pros:
+    > pros:
         - supports node-based workflows
         -  high customizability
-    cons:
+    > cons:
         - limited to react ecosystem
         - need high familiarity
 
 2. stateful.js
-    pros:
+    > pros:
         - lightweight, simple
         - integrates well with vanilla js/ts projects
-    cons:
+    > cons:
         - limited to simple diagrams
 
 3. konva.js
-    pros:   
+    > pros:   
         - build highly interactive graphics
         - easy to use api for canvas based rendering
         - object oriented API for many shapes
-    cons:
+    > cons:
         - not a dedecated diagramming lib.
         - more effort needed for process-specific tools
 
------- others:
+> others:
     - jinjaJs -> compile jinja2 frameworks (flask, django) in JS
     - AnyChart
     - webix -> cross-platform web apps toolkit
