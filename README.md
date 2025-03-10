@@ -1,79 +1,40 @@
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
 
-## How to run the project
+## Getting Started
 
-- cd into process-mapping-tool folder
-- npm install
-- npm run dev
-- open the localhost link in your browser
+First, run the development server:
 
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-### Libs that might be helpful:
----------DIAGRAMMING LIBS----------
-1. BPMN.io
-    > pros:
-        - focused on business process model and notation
-        - open-source & free
-        - lightweight
-    > cons:
-        - limited support for non-bpmn diagrams
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-2. GoJs
-    > pros:
-        - lots of features for diagrams, process flows
-        - high customization  --> lots of colours and anims
-        - can handle large diagrams
-    > cons:
-        - licensable
-        - codebase and configs can be complex
+You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
 
-3. JointJS/ Rappid
-    > pros:
-        - diagrams customization
-        - supports bpmn
-        - handles complex workflows
-    > cons:
-        - steep learning curve
-        - Rappid commercial - expensive
+[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
 
--------- FRONTEND ----------
-1. React flow
-    > pros:
-        - supports node-based workflows
-        -  high customizability
-    > cons:
-        - limited to react ecosystem
-        - need high familiarity
+The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
 
-2. stateful.js
-    > pros:
-        - lightweight, simple
-        - integrates well with vanilla js/ts projects
-    > cons:
-        - limited to simple diagrams
+This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-3. konva.js
-    > pros:   
-        - build highly interactive graphics
-        - easy to use api for canvas based rendering
-        - object oriented API for many shapes
-    > cons:
-        - not a dedecated diagramming lib.
-        - more effort needed for process-specific tools
+## Learn More
 
-> others:
-    - jinjaJs -> compile jinja2 frameworks (flask, django) in JS
-    - AnyChart
-    - webix -> cross-platform web apps toolkit
-    - jQueryUI, jQWidgets -> GUI widgets, anims, themes, etc.
-    - knockout -> js implementation/ template of model-view-view model pattern
-    - mojito -> model-view-controller web app framework
-    - modernizr -> detects if user's browser is unable to support web app's features 
-    - vueJs -> framework for building UI.
-        -> uses mainly html, 
-            - (react.js uses jsx + html)
+To learn more about Next.js, take a look at the following resources:
 
-[more libs](https://github.com/jellydn/awesome-typesafe?tab=readme-ov-file)
--------TESTING FRAMEWORKS--------
-1. Jest 
-2. Cypress
-3. QUnit
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
