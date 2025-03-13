@@ -1,8 +1,8 @@
 import { useRouter } from 'next/router';
 import { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import styles from '../styles/Login.module.css'; // Import custom styles
-import NavBar from "../components/NavBar";
+import styles from '../styles/Login.module.css';
+import NavBar from './../components/NavBar';
 
 export default function Home() {
   const router = useRouter();
@@ -13,7 +13,7 @@ export default function Home() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (email === 'test@gmail.com' && password === 'pass') {
+    if (email === 'test@example.com' && password === 'password') {
       setIsLoggedIn(true);
       router.push('/diagram');
     } else {
@@ -23,10 +23,9 @@ export default function Home() {
 
   return (
     <div>
-      {/* Navigation Bar */}
+      {/* Include Header */}
       <NavBar />
 
-      {/* Show Login or Main Content */}
       {isLoggedIn ? (
         <div className={styles.mainContent}>
           <h1>Main page</h1>
