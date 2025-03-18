@@ -11,7 +11,7 @@ export default function Login() {
 
     // Add authentication logic here
     if (email === 'test@example.com' && password === 'password') {
-      router.push('/diagram'); // Redirect to dashboard after login
+      router.push('/dashboard'); // Redirect to dashboard after login
     } else {
       alert('Invalid credentials');
     }

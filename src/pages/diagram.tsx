@@ -8,15 +8,12 @@ function Diagram() {
     <div>
       {/* Navigation Bar */}
       <NavBar />
-      
-      {/* Section Bar */}
-      <SectionBar />
-      
+
       {/* Main Layout with Resizable Bar */}
       <div style={{ display: 'flex', height: 'calc(100vh - 112px)' }}>
         {/* Resizable Sidebar */}
         <ResizableBar />
-        
+
         {/* Main Content */}
         <div style={{ flex: 1, padding: '20px' }}>
           <h1>Welcome to Rose Playbook</h1>

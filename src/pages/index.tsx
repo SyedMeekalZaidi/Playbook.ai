@@ -15,7 +15,7 @@ export default function Home() {
 
     if (email === 'test@example.com' && password === 'password') {
       setIsLoggedIn(true);
-      router.push('/diagram');
+      router.push('/dashboard');
     } else {
       alert('Invalid credentials');
     }

@@ -1,4 +1,22 @@
-.navbar-brand-custom {
-    margin-left: -70px; /* Adjust this value as needed */
+.navbar-brand {
+    /* position: relative; */
+    display: flex;
+    font-size: 30px;
   }
-  
+
+.logo {
+  /* position: relative; */
+  margin: 3% 10%;
+  left: 20px;
+  width: 30px;
+  height: 30px;
+}
+
+.navbar-toggle {
+  margin-right: 3%;
+}
+.navbar-collapse {
+  /* position: relative; */
+  margin: 0 5%;
+}
+

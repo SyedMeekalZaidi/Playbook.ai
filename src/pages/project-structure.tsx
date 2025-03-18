@@ -18,7 +18,7 @@ function ProjectStructure() {
     <div>
       {/* Navigation Bar */}
       <NavBar />
-        
+
       {/* Main Content */}
       <div style={{ flex: 1, padding: '20px' }}>
         <div className="steps">
@@ -54,7 +54,7 @@ function ProjectStructure() {
                 No
               </label>
             </div>
-            
+
           </div>
 
           {/* Question 2 */}
