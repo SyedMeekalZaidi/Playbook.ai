@@ -10,21 +10,26 @@ datasource db {
 
 enum Role {
   ADMIN
-  USER
+  PLAYBOOK_CREATOR
+  COLLABORATOR
+  VIEWER
 }
 
+
 model User {
-  id             String                 @id @default(uuid())
-  email          String                 @unique
+  id             String   @id @default(uuid())
+  email          String   @unique
   name           String?
-  role           Role                   @default(USER)
-  playbooks      Playbook[] // A user can own multiple playbooks
+  password       String   // ✅ Ensure this line exists
+  role           Role
+  playbooks      Playbook[]
   collaborations PlaybookCollaborator[]
-  lockedNodes    Node[] // Add relation for locked nodes
-  sessions       CollaborationSession[] // Add relation for sessions
-  changeLogs     ChangeLog[] // Add relation for change logs
-  createdAt      DateTime               @default(now())
+  lockedNodes    Node[]
+  sessions       CollaborationSession[]
+  changeLogs     ChangeLog[]
+  createdAt      DateTime @default(now())
 }
+
 
 model Playbook {
   id               String                 @id @default(uuid())
