@@ -12,8 +12,11 @@
   /* Header style */
   .sidebar h5 {
     font-weight: bold;
-    color: #000;
+    color: #000000;
+    padding: 10px;
     margin-bottom: 12px;
+    background-color: rgb(255, 255, 255);
+    border-radius: 12px;
   }
   
   /* List container */
@@ -37,7 +40,7 @@
   
   /* Active list item */
   .sidebar-item.active {
-    background-color: #e4c078;
+    background-color: rgb(255, 254, 211);
     font-weight: bold;
     border-radius: 12px;
   }
@@ -66,7 +69,7 @@
   .nested-list li {
     padding: 4px 0;
     font-size: 14px;
-    color: #555;
+    color: #000000;
     position: relative;
   }
   
@@ -83,7 +86,7 @@
     top: 0;
     width: 1px;
     height: 100%;
-    background-color: #aaa;
+    background-color: #000000;
   }
   
   /* Thin horizontal line for hierarchy */
@@ -94,13 +97,13 @@
     top: 10px;
     width: 12px;
     height: 1px;
-    background-color: #aaa;
+    background-color: #000000;
   }
   
   /* Expand/Collapse Icon */
   .expand-icon {
     display: inline-block;
-    transform: rotate(90deg);
+    transform: rotate(180deg);
     transition: transform 0.2s ease;
   }
   
