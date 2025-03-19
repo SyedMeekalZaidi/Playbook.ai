@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma';
-import { Role } from '@prisma/client';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcrypt';
 
@@ -12,16 +11,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { email, password, role, secretKey } = req.body;
 
-  try {
-    console.log('Request Body:', { email, password, role, secretKey });
+  console.log('🛠️ Signup Request:', { email, password, role, secretKey });
 
-    // Validate role using Prisma Role enum
-    if (!Object.values(Role).includes(role)) {
+  try {
+    // Validate role
+    if (!['ADMIN', 'PLAYBOOK_CREATOR', 'COLLABORATOR', 'VIEWER'].includes(role)) {
+      console.error('🚨 Invalid role:', role);
       return res.status(400).json({ error: 'Invalid role' });
     }
 
     // Validate secret key for admin
-    if (role === Role.ADMIN && secretKey !== ADMIN_SECRET_KEY) {
+    if (role === 'ADMIN' && secretKey !== ADMIN_SECRET_KEY) {
+      console.error('🚨 Invalid admin secret key');
       return res.status(403).json({ error: 'Invalid admin secret key' });
     }
 
@@ -29,22 +30,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const hashedPassword = await bcrypt.hash(password, 10);
 
     console.log('🔐 Hashed password:', hashedPassword);
-    
-    // Create user using Prisma
+
+    // Attempt to create user
+    console.log('🛠️ Creating user in database...');
     const newUser = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
-        role: role as Role,
+        role: role as 'ADMIN' | 'PLAYBOOK_CREATOR' | 'COLLABORATOR' | 'VIEWER',
       },
     });
 
     console.log('✅ User created:', newUser);
 
-    res.status(201).json({ message: 'User created successfully', user: newUser });
+    return res.status(201).json({ message: 'User created successfully', user: newUser });
   } catch (error: any) {
     console.error('🔥 Prisma Error:', error);
 
+    // Handle Prisma-specific errors
     if (error.code === 'P2002') {
       return res.status(400).json({ error: 'Email already exists' });
     }
