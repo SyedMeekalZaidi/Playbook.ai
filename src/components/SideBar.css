@@ -1,9 +1,125 @@
-.sidebar-container {
-    position: fixed;
+/* Sidebar container */
+.sidebar {
+    background-color: #fae6b1;
+    padding: 16px;
+    width: 300px;
+    border-radius: 16px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+    font-family: 'Arial', sans-serif;
+  }
+  
+  /* Header style */
+  .sidebar h5 {
+    font-weight: bold;
+    color: #000;
+    margin-bottom: 12px;
+  }
+  
+  /* List container */
+  .sidebar-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  /* Main list items */
+  .sidebar-item {
+    padding: 10px 16px;
+    background-color: transparent;
+    border-radius: 12px;
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+    position: relative;
+  }
+  
+  /* Active list item */
+  .sidebar-item.active {
+    background-color: #e4c078;
+    font-weight: bold;
+    border-radius: 12px;
+  }
+  
+  /* Hover effect */
+  .sidebar-item:hover {
+    background-color: #f0d49e;
+  }
+  
+  /* Collapsible section */
+  .collapsible {
     display: flex;
-    flex-direction: column;
-    border-right: 1px solid #0b0a09;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: bold;
+  }
+  
+  /* Nested list container */
+  .nested-list {
+    list-style-type: none;
+    padding-left: 24px;
+    margin-top: 8px;
+  }
+  
+  /* Nested list items */
+  .nested-list li {
+    padding: 4px 0;
+    font-size: 14px;
+    color: #555;
+    position: relative;
+  }
+  
+  /* Bold nested list item */
+  .nested-list .bold {
+    font-weight: bold;
+  }
+  
+  /* Thin vertical line for hierarchy */
+  .nested-list li::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 0;
+    width: 1px;
     height: 100%;
-    width: 250px;
-    left: 0px;
-}
+    background-color: #aaa;
+  }
+  
+  /* Thin horizontal line for hierarchy */
+  .nested-list li::after {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 10px;
+    width: 12px;
+    height: 1px;
+    background-color: #aaa;
+  }
+  
+  /* Expand/Collapse Icon */
+  .expand-icon {
+    display: inline-block;
+    transform: rotate(90deg);
+    transition: transform 0.2s ease;
+  }
+  
+  .expand-icon.collapsed {
+    transform: rotate(0deg);
+  }
+  
+  /* Event section header */
+  .sidebar-item.event-header {
+    background-color: #f0d49e;
+    font-weight: bold;
+    border-radius: 12px;
+    margin-top: 16px;
+  }
+  
+  /* Rounded border for overall sidebar */
+  .sidebar-wrapper {
+    border: 1px solid #ccc;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  

@@ -20,7 +20,7 @@ export default function Signup() {
 
     // Example: Signup logic (replace with actual signup API call)
     alert('Account created successfully!');
-    router.push('/login'); // Redirect to login after signup
+    router.push('/diagram'); // Redirect to login after signup
   };
 
   return (
