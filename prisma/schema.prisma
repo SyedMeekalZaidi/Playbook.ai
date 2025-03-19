@@ -10,115 +10,113 @@ datasource db {
 
 enum Role {
   ADMIN
-  PLAYBOOK_CREATOR
-  COLLABORATOR
-  VIEWER
+  USER
 }
 
 model User {
-  id             String   @id @default(uuid())
-  email          String   @unique
+  id             String                 @id @default(uuid())
+  email          String                 @unique
   name           String?
-  role           Role     @default(COLLABORATOR)
+  role           Role                   @default(USER)
   playbooks      Playbook[] // A user can own multiple playbooks
   collaborations PlaybookCollaborator[]
   lockedNodes    Node[] // Add relation for locked nodes
   sessions       CollaborationSession[] // Add relation for sessions
   changeLogs     ChangeLog[] // Add relation for change logs
-  createdAt      DateTime @default(now())
+  createdAt      DateTime               @default(now())
 }
 
 model Playbook {
-  id          String    @id @default(uuid())
-  name        String
-  description String?
-  ownerId     String
-  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  processes   Process[]
-  collaborators PlaybookCollaborator[]
+  id               String                 @id @default(uuid())
+  name             String
+  description      String?
+  ownerId          String
+  owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  processes        Process[]
+  collaborators    PlaybookCollaborator[]
   versionHistories VersionHistory[]
-  changeLogs  ChangeLog[]
-  sessions    CollaborationSession[] // Add relation for sessions
-  isDeleted   Boolean  @default(false) // Soft delete flag
-  deletedAt   DateTime? // Timestamp when flagged for deletion
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt()
+  changeLogs       ChangeLog[]
+  sessions         CollaborationSession[] // Add relation for sessions
+  isDeleted        Boolean                @default(false) // Soft delete flag
+  deletedAt        DateTime? // Timestamp when flagged for deletion
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt()
 }
 
 model PlaybookCollaborator {
-  id          String  @id @default(uuid())
-  playbookId  String
-  userId      String
-  role        Role    @default(VIEWER) // Collaborator role (read-only by default)
-  playbook    Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  playbookId String
+  userId     String
+  role       Role     @default(ADMIN) // Collaborator role (read-only by default)
+  playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
 }
 
 model Process {
-  id          String  @id @default(uuid())
-  name        String
-  description String?
-  playbookId  String
-  playbook    Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  parentId    String?  // For nested processes
-  parent      Process? @relation("ProcessToProcess", fields: [parentId], references: [id])
-  subProcesses Process[] @relation("ProcessToProcess")
-  nodes       Node[]
-  parameters  Parameter[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt()
+  id           String      @id @default(uuid())
+  name         String
+  description  String?
+  playbookId   String
+  playbook     Playbook    @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  parentId     String? // For nested processes
+  parent       Process?    @relation("ProcessToProcess", fields: [parentId], references: [id])
+  subProcesses Process[]   @relation("ProcessToProcess")
+  nodes        Node[]
+  parameters   Parameter[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt()
 }
 
 model Node {
-  id         String  @id @default(uuid())
+  id         String   @id @default(uuid())
   name       String
-  type       String  // Type of BPMN element (e.g., task, event, gateway)
+  type       String // Type of BPMN element (e.g., task, event, gateway)
   processId  String
-  process    Process @relation(fields: [processId], references: [id], onDelete: Cascade)
-  lockedById String?  // Locking for real-time editing
+  process    Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  lockedById String? // Locking for real-time editing
   lockedBy   User?    @relation(fields: [lockedById], references: [id])
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt()
 }
 
 model Parameter {
-  id         String   @id @default(uuid())
-  name       String
-  type       String   // text, number, dropdown
-  options    String[] // For dropdown values
-  processId  String
-  process    Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt()
+  id        String   @id @default(uuid())
+  name      String
+  type      String // text, number, dropdown
+  options   String[] // For dropdown values
+  processId String
+  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt()
 }
 
 model CollaborationSession {
-  id         String  @id @default(uuid())
+  id         String    @id @default(uuid())
   playbookId String
   userId     String
-  playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  startedAt  DateTime @default(now())
+  playbook   Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startedAt  DateTime  @default(now())
   endedAt    DateTime?
 }
 
 model ChangeLog {
-  id          String  @id @default(uuid())
-  playbookId  String
-  userId      String
-  action      String  // e.g., "Added Process", "Updated Node"
-  details     String? // Additional details on change
-  playbook    Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  timestamp   DateTime @default(now())
+  id         String   @id @default(uuid())
+  playbookId String
+  userId     String
+  action     String // e.g., "Added Process", "Updated Node"
+  details    String? // Additional details on change
+  playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timestamp  DateTime @default(now())
 }
 
 model VersionHistory {
-  id          String  @id @default(uuid())
-  playbookId  String
-  version     Int
-  data        Json
-  createdAt   DateTime @default(now())
-  playbook    Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  playbookId String
+  version    Int
+  data       Json
+  createdAt  DateTime @default(now())
+  playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 }

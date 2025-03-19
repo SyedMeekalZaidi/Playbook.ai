@@ -12,18 +12,20 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@prisma/client": "^6.5.0",
+    "@supabase/supabase-js": "^2.39.8",
+    "bcrypt": "^5.1.1",
     "bootstrap": "^5.3.3",
     "next": "^15.2.1",
-    "@prisma/client": "^6.5.0",
     "prisma": "^6.5.0",
     "react": "^19.0.0",
     "react-bootstrap": "^2.10.9",
-    "react-dom": "^19.0.0",
-    "@supabase/supabase-js": "^2.39.8"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/bcrypt": "^5.0.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

@@ -9,6 +9,8 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState('USER'); // Changed to uppercase
+  const [secretKey, setSecretKey] = useState(''); // New state for secret key
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,9 +20,37 @@ export default function Signup() {
       return;
     }
 
-    // Example: Signup logic (replace with actual signup API call)
-    alert('Account created successfully!');
-    router.push('/diagram'); // Redirect to login after signup
+    // If role is ADMIN, check if secret key is provided
+    if (role === 'ADMIN' && !secretKey) {
+      alert('Please provide the secret key for admin signup');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          email, 
+          password, 
+          role, 
+          secretKey: role === 'ADMIN' ? secretKey : undefined // Include secretKey only for admin
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Signup failed');
+      }
+
+      alert('Account created successfully!');
+      router.push('/diagram');
+    } catch (error: any) {
+      alert(`Error: ${error.message || 'Signup failed'}`);
+    }
   };
 
   return (
@@ -56,6 +86,30 @@ export default function Signup() {
               required
               className={styles.input}
             />
+
+            {/* Role Selection */}
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value.toUpperCase())} // Convert to uppercase
+              required
+              className={styles.input}
+            >
+              <option value="USER">User</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+
+            {/* Secret Key Input (Only for Admin) */}
+            {role === 'ADMIN' && (
+              <input
+                type="password"
+                placeholder="Admin Secret Key"
+                value={secretKey}
+                onChange={(e) => setSecretKey(e.target.value)}
+                required
+                className={styles.input}
+              />
+            )}
+
             <button type="submit" className={styles.button}>
               Sign Up
             </button>
