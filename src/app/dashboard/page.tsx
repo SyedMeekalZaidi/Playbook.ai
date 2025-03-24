@@ -1,12 +1,10 @@
-import NavBar from "../components/NavBar";
-import SideBar from "../components/SideBar";
+'use client';
+import NavBar from "../../components/NavBar";
+import SideBar from "../../components/SideBar";
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
-// import '../styles/dashboard.css';
-
-
 
 export default function Dashboard () {
     return (
@@ -52,12 +50,8 @@ export default function Dashboard () {
                             </Card.Body>
                         </Card>
                     </div>
-
                 </div>
-
             </div>
         </div>
-
     )
-
 }

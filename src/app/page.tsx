@@ -1,8 +1,10 @@
-import { useRouter } from 'next/router';
+'use client';
+
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import NavBar from './../components/NavBar';
-import Login from './login';
+import Login from './login/page';
 
 export default function Home() {
   const router = useRouter();

@@ -1,7 +1,7 @@
+'use client'
 import 'bootstrap/dist/css/bootstrap.min.css';
-import NavBar from "../components/NavBar";
-import SectionBar from "../components/SectionBar";
-import ResizableBar from "../components/ResizableBar";
+import NavBar from "../../components/NavBar";
+import ResizableBar from "../../components/ResizableBar";
 
 function Diagram() {
   return (

@@ -1,8 +1,10 @@
-import { useRouter } from 'next/router';
+'use client';
+
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import styles from '../styles/Signup.module.css';
-import NavBar from './../components/NavBar';
+import styles from '../../styles/Signup.module.css';
+import NavBar from '../../components/NavBar';
 
 export default function Signup() {
   const router = useRouter();
