@@ -8,54 +8,45 @@ datasource db {
   directUrl = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  PLAYBOOK_CREATOR
-  COLLABORATOR
-  VIEWER
-}
-
-
 model User {
-  id             String   @id @default(uuid())
-  email          String   @unique
+  id             String                 @id @default(uuid())
+  email          String                 @unique
   name           String?
-  password       String   // ✅ Ensure this line exists
   role           Role
+  createdAt      DateTime               @default(now())
+  password       String
+  changeLogs     ChangeLog[]
+  sessions       CollaborationSession[]
+  lockedNodes    Node[]
   playbooks      Playbook[]
   collaborations PlaybookCollaborator[]
-  lockedNodes    Node[]
-  sessions       CollaborationSession[]
-  changeLogs     ChangeLog[]
-  createdAt      DateTime @default(now())
 }
-
 
 model Playbook {
   id               String                 @id @default(uuid())
   name             String
   description      String?
   ownerId          String
-  owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  processes        Process[]
-  collaborators    PlaybookCollaborator[]
-  versionHistories VersionHistory[]
-  changeLogs       ChangeLog[]
-  sessions         CollaborationSession[] // Add relation for sessions
-  isDeleted        Boolean                @default(false) // Soft delete flag
-  deletedAt        DateTime? // Timestamp when flagged for deletion
+  isDeleted        Boolean                @default(false)
+  deletedAt        DateTime?
   createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt()
+  updatedAt        DateTime               @updatedAt
+  changeLogs       ChangeLog[]
+  sessions         CollaborationSession[]
+  owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  collaborators    PlaybookCollaborator[]
+  processes        Process[]
+  versionHistories VersionHistory[]
 }
 
 model PlaybookCollaborator {
   id         String   @id @default(uuid())
   playbookId String
   userId     String
-  role       Role     @default(ADMIN) // Collaborator role (read-only by default)
+  role       Role     @default(ADMIN)
+  createdAt  DateTime @default(now())
   playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
 }
 
 model Process {
@@ -63,58 +54,61 @@ model Process {
   name         String
   description  String?
   playbookId   String
-  playbook     Playbook    @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  parentId     String? // For nested processes
-  parent       Process?    @relation("ProcessToProcess", fields: [parentId], references: [id])
-  subProcesses Process[]   @relation("ProcessToProcess")
+  parentId     String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  bpmnId       String?
+  bpmnXml      String?
   nodes        Node[]
   parameters   Parameter[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt()
+  parent       Process?    @relation("ProcessToProcess", fields: [parentId], references: [id])
+  subProcesses Process[]   @relation("ProcessToProcess")
+  playbook     Playbook    @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 }
 
 model Node {
   id         String   @id @default(uuid())
   name       String
-  type       String // Type of BPMN element (e.g., task, event, gateway)
+  type       String
   processId  String
-  process    Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
-  lockedById String? // Locking for real-time editing
-  lockedBy   User?    @relation(fields: [lockedById], references: [id])
+  lockedById String?
   createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt()
+  updatedAt  DateTime @updatedAt
+  bpmnId     String?
+  lockedBy   User?    @relation(fields: [lockedById], references: [id])
+  process    Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
 }
 
 model Parameter {
   id        String   @id @default(uuid())
   name      String
-  type      String // text, number, dropdown
-  options   String[] // For dropdown values
+  type      String
+  options   String[]
   processId String
-  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt()
+  updatedAt DateTime @default(now())
+  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
 }
 
 model CollaborationSession {
   id         String    @id @default(uuid())
   playbookId String
   userId     String
-  playbook   Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   startedAt  DateTime  @default(now())
   endedAt    DateTime?
+  playbook   Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ChangeLog {
   id         String   @id @default(uuid())
   playbookId String
   userId     String
-  action     String // e.g., "Added Process", "Updated Node"
-  details    String? // Additional details on change
+  action     String
+  details    String?
+  timestamp  DateTime @default(now())
   playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  timestamp  DateTime @default(now())
 }
 
 model VersionHistory {
@@ -124,4 +118,11 @@ model VersionHistory {
   data       Json
   createdAt  DateTime @default(now())
   playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  PLAYBOOK_CREATOR
+  COLLABORATOR
+  VIEWER
 }
