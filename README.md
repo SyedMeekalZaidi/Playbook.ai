@@ -1,40 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# ROSE Playbook Process Mapping Tool
 
-## Getting Started
+A collaborative process mapping tool integrated with the ROSE Playbook methodology, enabling NGOs and businesses to design, customize, and deploy process workflows.
 
-First, run the development server:
+## Technology Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Frontend:** Next.js with TypeScript and React
+- **Backend:** tRPC for type-safe API communication
+- **Database:** PostgreSQL via Supabase
+- **ORM:** Prisma
+- **Styling:** Tailwind CSS
+- **Authentication:** Supabase Auth
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+# Database 
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+## Database Connection
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+Supabase is a Postgresql database hosted in the cloud, and we are using Prisma to define our schema in a type-safe method to match our TypeScript stack. 
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+In order to connect to Supabase, we need to define the environment variables in `.env`. You can copy the variables from `.env.example` into `.env` and enter the database password in the `DATABASE_URL`. 
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Common Database Operations
 
-## Learn More
+### Setting Up
 
-To learn more about Next.js, take a look at the following resources:
+1. Install dependencies:
+   `npm install`
+2. Generate Prisma client
+    `npx prisma generate`
+3. Push Schema change to database
+    `npx prisma db push`
+        - Migrations are handled by Supabase
+4. View local database data:
+    `npx prisma studio`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Database Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The database is structured around several core entities:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+### Core Entities
+
+1. **User**: System users with authentication and role-based access
+2. **Playbook**: Main container for process workflows
+3. **Process**: Individual workflows with hierarchical nesting capabilities
+4. **Node**: BPMN elements (tasks, events, gateways) within processes
+5. **Parameter**: Customizable fields for process configuration
+
+### Key Relationships
+
+- **Process Hierarchy**: Processes can contain sub-processes through a self-referential relationship
+- **Collaboration**: Users can be added as collaborators to playbooks with specific roles
+- **Version Control**: Changes are tracked and full playbook states are saved as versions
+- **Locking**: Nodes can be locked by users during editing to prevent conflicts
+
+## Database Connection
+
+The project uses Supabase as the database provider with Prisma as the ORM. Connection details are stored in the `.env` file:
+
+
+
