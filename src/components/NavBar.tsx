@@ -18,12 +18,15 @@ const NavBar: React.FC = () => {
           </Navbar.Brand>
           <Navbar.Toggle className='navbar-toggle' aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
-            <Nav className="me-auto">
-              <Nav.Link href='/dashboard'>Dashboard</Nav.Link>
-              <Nav.Link href="/project-structure">Project Structure</Nav.Link>
-              <Nav.Link href="/diagram">Diagram</Nav.Link>
-            </Nav>
-          </Navbar.Collapse>
+          <Nav className="me-auto">
+            <Nav.Link href='/dashboard'>Dashboard</Nav.Link>
+            <Nav.Link href="/project-structure">Project Structure</Nav.Link>
+            <Nav.Link href="/diagram">Diagram</Nav.Link>
+          </Nav>
+          <Nav className="ms-auto">
+            <Nav.Link href="/account">Account</Nav.Link>
+          </Nav>
+        </Navbar.Collapse>
         {/* </Container> */}
       </Navbar>
       {/* <SectionBar/> */}
