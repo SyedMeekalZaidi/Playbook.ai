@@ -36,6 +36,7 @@ export default function Login() {
         throw new Error(data.error || 'Login failed');
       }
 
+      localStorage.setItem('loggedInEmail', data.user.email);
       alert('Login successful!');
       router.push('/dashboard');
     } catch (error: any) {
