@@ -1,89 +1,173 @@
 'use client';
 import React, {useState} from 'react';
+import { useRouter } from 'next/navigation';
 import NavBar from '@/components/NavBar';
 import Sidebar from '@/components/SideBar';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
+import { Dropdown, DropdownButton } from "react-bootstrap";
 import '@/styles/create-process.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-interface QuestionBox {
-    id: number;
-    content: React.JSX.Element;
+interface Parameter { //the individual parameter
+    id: number; // (for UI control only)
+    name: string; //(question/title)
+    type: string;
+    mandatory: boolean;
+    options: [];
+    //info: string
 }
 
 export default function newProcess () {
-    const [questionList, setQuestionList] = useState<QuestionBox[]>([]);
-    const [nextId, setNextId] = useState<number>(1);
+    const [processName, setProcessName] = useState('');
 
-    const questionBox = () => { //temporary.
+    const [paramList, setParamList] = useState<Parameter[]>([]);
+    const [nextParamId, setNextParamId] = useState<number>(1);
+
+    const handleAddParam = () => {
+        const newParam: Parameter = {
+            id: nextParamId,
+            name: '',
+            type: 'Checkbox',
+            mandatory: false,
+            options: []
+        }
+
+        setParamList([...paramList, newParam]);
+        setNextParamId(nextParamId + 1);
+    }
+
+    const handleRemoveParam = (id:number) => {setParamList(prevList => prevList.filter(param => param.id !== id));}
+
+
+    const renderParamBox = (param:Parameter) => {
         return (
-            <div className='question-box border-b'>
+            <div key={param.id} className='question-box border-b'>
+                {/* Param name */}
                 <div className='flex flex-row'>
-                    <input className='question-input'type="text" placeholder='Enter your question'/>
+                    <input
+                        className='question-input'
+                        type="text"
+                        placeholder='Enter parameter'
+                        value={param.name}
+                        onChange={(e) =>
+                            setParamList(prevList =>
+                                prevList.map(p =>
+                                    p.id === param.id ? { ...p, name: e.target.value } : p
+                                )
+                            )
+                        }
+                    />
                 </div>
+
+                {/* Question type */}
                 <div className='flex flex-row justify-between border-b'>
-                    <div className='flex flex-row'>
-                        <p>Type: check box</p>
-                        {/*  add dropdown menu here*/}
+                    <div className='flex flex-row ml-3'>
+                        <DropdownButton id={`dropdown-basic-button-${param.id}`} title={`Type: ${param.type}`}>
+                            <Dropdown.Item onClick={() => updateQuestionType(param.id, "Checkbox")}>Checkbox</Dropdown.Item>
+                            <Dropdown.Item onClick={() => updateQuestionType(param.id, "Radio")}>Radio</Dropdown.Item>
+                            <Dropdown.Item onClick={() => updateQuestionType(param.id, "Textbox")}>Textbox</Dropdown.Item>
+                        </DropdownButton>
                     </div>
+
+                    {/* Mandatory */}
                     <Form.Check
                         type='checkbox'
                         label='Mandatory?'
-                        id={`mandatory-checkbox-${nextId}`}
+                        id={`mandatory-checkbox-${param.id}`}
+                        checked={param.mandatory}
+                        onChange={() =>
+                            setParamList(prevList =>
+                                prevList.map(p =>
+                                    p.id === param.id ? { ...p, mandatory: !p.mandatory } : p
+                                )
+                            )
+                        }
                     />
-                    <button onClick={() => handleRemoveQuestion(nextId)}>
+                    <button onClick={() => handleRemoveParam(param.id)}>
                         <img src="/trashcan.png" alt="remove" />
                     </button>
                 </div>
-                <div>
-                    <p>question answers here</p>
+
+                <div className='mt-3'>
+                    {renderQuestionField(param.type)}
                 </div>
             </div>
         )
     }
 
-    const handleAddQuestion = () => {
-        const newQuestion: QuestionBox = {
-            id:nextId,
-            content: (
-                <div className='question-box border-b'>
-                    <div className='flex flex-row'>
-                        <input className='question-input'type="text" placeholder='Enter your question'/>
-                    </div>
-                    <div className='flex flex-row justify-between'>
-                        <div className='flex flex-row border-1'>
-                            <p>Type: check box  V</p>
-                            {/*  add dropdown menu here*/}
-                        </div>
-                        <Form.Check
-                            type='checkbox'
-                            label='Mandatory?'
-                            id={`mandatory-checkbox-${nextId}`}
-                        />
-                        <button onClick={() => handleRemoveQuestion(nextId)}>
-                            <img src="/trashcan.png" alt="remove" />
-                        </button>
-                    </div>
+    const renderQuestionField = (questionType: string) => {
+        switch (questionType) {
+            case "Checkbox":
+                return (
                     <div>
-                        <p>question answers here</p>
+                        <label>
+                            <input type="checkbox" />
+                            <input type="text" placeholder='Enter your question' />
+                        </label>
                     </div>
-                </div>
-            )
-        }
+                );
+            case "Radio":
+                return (
+                    <div className="flex flex-col space-y-1">
+                        <label>
+                            <input type="radio" name="radio-group" />
+                            <input type="text" placeholder='Enter option'/>
+                        </label>
 
-        setQuestionList((prevList) => [...prevList, newQuestion]);
-        setNextId(nextId + 1);
+                    </div>
+                );
+            case "Textbox":
+                return <textarea placeholder="Enter response..." className="border p-2 rounded w-full" />;
+            default:
+                return null;
+        }
     };
 
-    const handleRemoveQuestion = (id:number) => {
-        setQuestionList((prevList) => prevList.filter((box) => box.id !== id));
+    const updateQuestionType = (id:number, newType:string) => {
+        setParamList(prevList =>
+            prevList.map(param =>
+                param.id === id ? { ...param, type: newType } : param
+            )
+        );
     }
 
-    const handleSaveProcess = () => {
+    const router = useRouter();
+    const handleSave = async () => {
 
+        // add validations
+
+        try {
+            const response = await fetch("/api/process/parameter", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    processName,
+                    parameters: paramList.map(({ id, ...param }) => param), // Remove `id` since it's for UI control
+                }),
+            });
+
+            if (!response.ok) {
+                console.log("Response not OK(page.tsx try):", response);
+                throw new Error("Failed to save parameters.(page.tsx)");
+            }
+
+            const result = await response.json();
+            console.log("Parameters saved:", result);
+            alert("Process saved successfully!");
+
+            router.push('/dashboard');
+
+        } catch (error) {
+            console.error(error);
+            alert("Error saving the process.");
+        }
     }
 
+    // Manually add one item on component mount as default
+    React.useEffect(() => {
+        handleAddParam();
+    }, []);
 
     return (
         <div>
@@ -95,6 +179,7 @@ export default function newProcess () {
 
                 {/* content*/}
                 <div className='main-container '>
+                    {/* progress bar */}
                     <div className="steps">
                         <div className="step active">1. Assign a PIC</div>
                         <div className="step active">2. Gather Needs & Feasibility</div>
@@ -104,31 +189,27 @@ export default function newProcess () {
 
                     <div className='content-container'>
                         <div className='button-bar'>
-                            <button onClick={() => handleAddQuestion()}>
+                            <button onClick={() => handleAddParam()}>
                                 <img src="/plus.png" alt="add question" />
                             </button>
-                            {/* <button>
-                                <img src="/plus.png" alt="add question" />
-                            </button>
-                            <button>
-                                <img src="/plus.png" alt="add question" />
-                            </button> */}
                         </div>
 
-                        {/* container where question box will be added */}
+                        {/* container where param box will be added */}
                         <div id='content' className='content'>
-                            <input className='question-input' type="text" placeholder='Enter process name' />
-                            {questionBox()}
-                            {questionList.map((box) => (
-                                <div key={box.id}>
-                                    {box.content}
-                                </div>
-                            ))}
-                        </div>
+                            {/* Process name */}
+                            <input
+                                className='question-input'
+                                type="text"
+                                placeholder='Enter process ID'
+                                value={processName}
+                                onChange={(e) => setProcessName(e.target.value)}
+                            />
 
+                            {paramList.map((param) => (renderParamBox(param)))}
+                        </div>
                     </div>
                 </div>
-                <Button onClick={() => handleSaveProcess}
+                <Button onClick={() => handleSave()}
                     className='fixed right-0 bottom-0 m-3'>
                         Save
                 </Button>
@@ -158,3 +239,4 @@ export default function newProcess () {
         </div>
     )
 }
+

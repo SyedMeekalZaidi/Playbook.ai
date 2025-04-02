@@ -34,10 +34,10 @@ export default function Signup() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ 
-          email, 
-          password, 
-          role, 
+        body: JSON.stringify({
+          email,
+          password,
+          role,
           secretKey: role === 'ADMIN' ? secretKey : undefined // Include secretKey only for admin
         })
       });
@@ -49,7 +49,7 @@ export default function Signup() {
       }
 
       alert('Account created successfully!');
-      router.push('/diagram');
+      router.push('/dashboard');
     } catch (error: any) {
       alert(`Error: ${error.message || 'Signup failed'}`);
     }

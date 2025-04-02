@@ -50,7 +50,7 @@ model PlaybookCollaborator {
 
 model Process {
   id           String      @id @default(uuid())
-  name         String
+  name         String      @unique
   description  String?
   playbookId   String
   parentId     String?
@@ -80,13 +80,14 @@ model Node {
 
 model Parameter {
   id        String   @id @default(uuid())
+  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  processId String
   name      String
   type      String
+  mandatory Boolean
   options   String[]
-  processId String
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
-  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
 }
 
 model CollaborationSession {
