@@ -21,3 +21,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+
+export async function PATCH(req: Request) {
+    const { email, name } = await req.json();
+  
+    if (!email || !name) {
+      return NextResponse.json({ error: 'Email and name are required' }, { status: 400 });
+    }
+  
+    try {
+      const updatedUser = await prisma.user.update({
+        where: { email },
+        data: { name },
+      });
+  
+      return NextResponse.json({ user: updatedUser }, { status: 200 });
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }

@@ -9,13 +9,11 @@ const NavBar: React.FC = () => {
     <div>
       <Navbar bg="dark" variant="dark" expand="lg">
         {/* <Container> */}
-          <Navbar.Brand href="/" className="navbar-brand">
-            <img className='logo'
-              src="/rose-logo.png"
-              alt="Logo"
-            />
-            The Rose Playbook
-          </Navbar.Brand>
+          <div className="navbar-brand d-flex align-items-center">
+            <img className='logo' src="/rose-logo.png" alt="Logo" />
+            <span className="ms-2 text-white">The Rose Playbook</span>
+          </div>
+
           <Navbar.Toggle className='navbar-toggle' aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">

@@ -1,0 +1,15 @@
+26 March 2025 	
+        - Encounter Issue Connecting to the Database
+		- Caused by error 500 (Internal Server Error)
+		- Initial Troubleshooting is to use POSTMAN to debug
+		- Error is not solved
+
+31 March 2025 	
+        - Able to Connect to the Database by npx prisma generate
+		- But Encounter Issue on inserting data to table 
+		- Cause by JSON issue
+
+1 April ;2025 	
+        - Able to Insert Data to the database
+		- Solved by creating a router page on login and signup 
+		  which is used to connect frontend to POST to backend
