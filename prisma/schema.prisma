@@ -49,45 +49,43 @@ model PlaybookCollaborator {
 }
 
 model Process {
-  id           String      @id @default(uuid())
-  name         String      @unique
-  description  String?
-  playbookId   String
-  parentId     String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  bpmnId       String?
-  bpmnXml      String?
-  nodes        Node[]
-  parameters   Parameter[]
-  parent       Process?    @relation("ProcessToProcess", fields: [parentId], references: [id])
-  subProcesses Process[]   @relation("ProcessToProcess")
-  playbook     Playbook    @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  id            String    @id @default(uuid())
+  name          String
+  description   String?
+  playbook      Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  playbookId    String
+  nodes         Node[]
+  bpmnId        String?
+  bpmnXml       String?
+  parentId      String?
+  parentProcess Process?  @relation("ProcessToProcess", fields: [parentId], references: [id])
+  subProcesses  Process[] @relation("ProcessToProcess")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model Node {
-  id         String   @id @default(uuid())
-  name       String
-  type       String
-  processId  String
-  lockedById String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  bpmnId     String?
-  lockedBy   User?    @relation(fields: [lockedById], references: [id])
-  process    Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  type        String //bpmn node type
+  processId   String?
+  process     Process?        @relation(fields: [processId], references: [id], onDelete: Cascade)
+  parameters  NodeParameter[]
+  lockedById  String?
+  lockedBy    User?           @relation(fields: [lockedById], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }
 
-model Parameter {
+model NodeParameter {
   id        String   @id @default(uuid())
-  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
-  processId String
   name      String
-  type      String
+  node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  nodeId    String
+  type      String? //option type
   mandatory Boolean
   options   String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
 }
 
 model CollaborationSession {
