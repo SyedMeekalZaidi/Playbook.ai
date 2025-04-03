@@ -68,9 +68,9 @@ model Node {
   id          String          @id @default(uuid())
   name        String
   description String?
-  type        String //bpmn node type
-  processId   String?
-  process     Process?        @relation(fields: [processId], references: [id], onDelete: Cascade)
+  type        String? //bpmn node type
+  processId   String
+  process     Process         @relation(fields: [processId], references: [id], onDelete: Cascade)
   parameters  NodeParameter[]
   lockedById  String?
   lockedBy    User?           @relation(fields: [lockedById], references: [id])
@@ -83,7 +83,7 @@ model NodeParameter {
   name      String
   node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
   nodeId    String
-  type      String? //option type
+  type      String //option type
   mandatory Boolean
   options   String[]
 }
