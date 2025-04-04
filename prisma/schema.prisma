@@ -49,33 +49,45 @@ model PlaybookCollaborator {
 }
 
 model Process {
-  id           String    @id @default(uuid())
-  name         String
+  id           String      @id @default(uuid())
+  name         String      @unique
   description  String?
   playbookId   String
   parentId     String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
   bpmnId       String?
   bpmnXml      String?
   nodes        Node[]
-  parent       Process?  @relation("ProcessToProcess", fields: [parentId], references: [id])
-  subProcesses Process[] @relation("ProcessToProcess")
-  playbook     Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  parameters   Parameter[]
+  parent       Process?    @relation("ProcessToProcess", fields: [parentId], references: [id])
+  subProcesses Process[]   @relation("ProcessToProcess")
+  playbook     Playbook    @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 }
 
 model Node {
-  id            String          @id @default(uuid())
-  name          String
-  type          String?
-  processId     String
-  lockedById    String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  description   String?
-  lockedBy      User?           @relation(fields: [lockedById], references: [id])
-  process       Process         @relation(fields: [processId], references: [id], onDelete: Cascade)
-  NodeParameter NodeParameter[]
+  id         String   @id @default(uuid())
+  name       String
+  type       String
+  processId  String
+  lockedById String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  bpmnId     String?
+  lockedBy   User?    @relation(fields: [lockedById], references: [id])
+  process    Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+}
+
+model Parameter {
+  id        String   @id @default(uuid())
+  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  processId String
+  name      String
+  type      String
+  mandatory Boolean
+  options   String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
 }
 
 model CollaborationSession {
