@@ -11,9 +11,9 @@ datasource db {
 model User {
   id             String                 @id @default(uuid())
   email          String                 @unique
-  name           String?
   role           Role
   password       String
+  name           String?
   changeLogs     ChangeLog[]
   sessions       CollaborationSession[]
   lockedNodes    Node[]
@@ -49,45 +49,33 @@ model PlaybookCollaborator {
 }
 
 model Process {
-  id           String      @id @default(uuid())
-  name         String      @unique
+  id           String    @id @default(uuid())
+  name         String
   description  String?
   playbookId   String
   parentId     String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   bpmnId       String?
   bpmnXml      String?
   nodes        Node[]
-  parameters   Parameter[]
-  parent       Process?    @relation("ProcessToProcess", fields: [parentId], references: [id])
-  subProcesses Process[]   @relation("ProcessToProcess")
-  playbook     Playbook    @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  parent       Process?  @relation("ProcessToProcess", fields: [parentId], references: [id])
+  subProcesses Process[] @relation("ProcessToProcess")
+  playbook     Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 }
 
 model Node {
-  id         String   @id @default(uuid())
-  name       String
-  type       String
-  processId  String
-  lockedById String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  bpmnId     String?
-  lockedBy   User?    @relation(fields: [lockedById], references: [id])
-  process    Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
-}
-
-model Parameter {
-  id        String   @id @default(uuid())
-  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
-  processId String
-  name      String
-  type      String
-  mandatory Boolean
-  options   String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  id            String          @id @default(uuid())
+  name          String
+  type          String?
+  processId     String
+  lockedById    String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  description   String?
+  lockedBy      User?           @relation(fields: [lockedById], references: [id])
+  process       Process         @relation(fields: [processId], references: [id], onDelete: Cascade)
+  NodeParameter NodeParameter[]
 }
 
 model CollaborationSession {
@@ -118,6 +106,16 @@ model VersionHistory {
   data       Json
   createdAt  DateTime @default(now())
   playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+}
+
+model NodeParameter {
+  id        String   @id
+  name      String
+  nodeId    String
+  type      String
+  mandatory Boolean
+  options   String[]
+  Node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 }
 
 enum Role {
