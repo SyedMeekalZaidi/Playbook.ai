@@ -37,18 +37,52 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, description, playbookId, bpmnXml } = body;
+    const { name, playbookId, bpmnXml, bpmnId } = body;
     
     if (!name || !playbookId) {
       return NextResponse.json({ error: 'Name and playbookId are required' }, { status: 400 });
     }
     
+    // First check if the specified playbook exists
+    const playbook = await prisma.playbook.findUnique({
+      where: { id: playbookId }
+    });
+    
+    // If playbook doesn't exist, create it with the specified ID
+    if (!playbook) {
+      // Find or create a default user for the playbook
+      let defaultUser = await prisma.user.findFirst({
+        where: { role: 'ADMIN' }
+      });
+      
+      if (!defaultUser) {
+        defaultUser = await prisma.user.create({
+          data: {
+            email: 'admin@example.com',
+            password: 'admin-password',
+            role: 'ADMIN',
+            name: 'System Admin'
+          }
+        });
+      }
+      
+      // Create the playbook with the exact ID provided
+      await prisma.playbook.create({
+        data: {
+          id: playbookId, // Use the exact ID
+          name: 'Test Playbook',
+          ownerId: defaultUser.id
+        }
+      });
+    }
+    
+    // Now create the process
     const process = await prisma.process.create({
       data: {
         name,
-        description,
         playbookId,
-        bpmnXml: bpmnXml || null
+        bpmnXml: bpmnXml || null,
+        bpmnId: bpmnId || null
       }
     });
     
@@ -63,7 +97,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, description, bpmnXml } = body;
+    const { id, name, bpmnXml, bpmnId } = body;
     
     if (!id) {
       return NextResponse.json({ error: 'Process ID is required' }, { status: 400 });
@@ -73,8 +107,8 @@ export async function PATCH(req: Request) {
       where: { id },
       data: {
         ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(bpmnXml !== undefined && { bpmnXml })
+        ...(bpmnXml !== undefined && { bpmnXml }),
+        ...(bpmnId !== undefined && { bpmnId })
       }
     });
     
@@ -95,6 +129,12 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Process ID is required' }, { status: 400 });
     }
     
+    // Delete all nodes associated with this process first
+    await prisma.node.deleteMany({
+      where: { processId: id }
+    });
+    
+    // Delete the process
     await prisma.process.delete({
       where: { id }
     });

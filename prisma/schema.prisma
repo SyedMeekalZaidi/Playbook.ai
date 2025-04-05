@@ -5,83 +5,66 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DATABASE_URL")
-}
-
-model User {
-  id             String                 @id @default(uuid())
-  email          String                 @unique
-  role           Role
-  password       String
-  name           String?
-  changeLogs     ChangeLog[]
-  sessions       CollaborationSession[]
-  lockedNodes    Node[]
-  playbooks      Playbook[]
-  collaborations PlaybookCollaborator[]
 }
 
 model Playbook {
   id               String                 @id @default(uuid())
   name             String
-  shortDescription String?                @db.VarChar(280)  // Twitter-style brief summary
-  documentContent  Json?                  // Rich text content with image references
-  ownerId          String
+  shortDescription String?                @db.VarChar(280)
+  documentContent  Json?
+  ownerId          String                 // Supabase Auth user ID
   isDeleted        Boolean                @default(false)
   deletedAt        DateTime?
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
-  changeLogs       ChangeLog[]
-  sessions         CollaborationSession[]
-  owner            User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   collaborators    PlaybookCollaborator[]
   processes        Process[]
   versionHistories VersionHistory[]
-  images           DocumentImage[]        // Related images
+  images           DocumentImage[]
+  sessions         CollaborationSession[] 
+  changeLogs       ChangeLog[]            
 }
 
 model PlaybookCollaborator {
   id         String   @id @default(uuid())
   playbookId String
-  userId     String
+  userId     String   // Supabase Auth user ID
   role       Role     @default(ADMIN)
   createdAt  DateTime @default(now())
   playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Process {
   id               String        @id @default(uuid())
   name             String
-  shortDescription String?       @db.VarChar(280)  // Brief summary for diagrams/lists
-  documentContent  Json?         // Rich text content with image references
-  playbook         Playbook      @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  shortDescription String?       @db.VarChar(280)
+  documentContent  Json?
   playbookId       String
-  nodes            Node[]
-  bpmnId           String?
-  bpmnXml          String?
   parentId         String?
-  parentProcess    Process?      @relation("ProcessToProcess", fields: [parentId], references: [id])
-  subProcesses     Process[]     @relation("ProcessToProcess")
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
-  images           DocumentImage[] // Related images
+  playbook         Playbook      @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  nodes            Node[]        
+  images           DocumentImage[] 
+  // Adding self-relation for parent-child processes if needed
+  parentProcess    Process?      @relation("ProcessToProcess", fields: [parentId], references: [id])
+  subProcesses     Process[]     @relation("ProcessToProcess")
 }
 
 model Node {
   id               String          @id @default(uuid())
   name             String
-  shortDescription String?         @db.VarChar(280)  // Brief summary
-  documentContent  Json?           // Rich text content with image references
-  type             String?         //bpmn node type
+  shortDescription String?         @db.VarChar(280)
+  documentContent  Json?
+  type             String?
+  bpmnId           String?
   processId        String
   process          Process         @relation(fields: [processId], references: [id], onDelete: Cascade)
   parameters       NodeParameter[]
   lockedById       String?
-  lockedBy         User?           @relation(fields: [lockedById], references: [id])
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
-  images           DocumentImage[] // Related images
+  images           DocumentImage[]
 }
 
 model NodeParameter {
@@ -89,7 +72,7 @@ model NodeParameter {
   name      String
   node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
   nodeId    String
-  type      String //option type
+  type      String
   mandatory Boolean
   options   String[]
 }
@@ -97,22 +80,20 @@ model NodeParameter {
 model CollaborationSession {
   id         String    @id @default(uuid())
   playbookId String
-  userId     String
+  userId     String    // Supabase Auth user ID
   startedAt  DateTime  @default(now())
   endedAt    DateTime?
   playbook   Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ChangeLog {
   id         String   @id @default(uuid())
   playbookId String
-  userId     String
+  userId     String   // Supabase Auth user ID
   action     String
   details    String?
   timestamp  DateTime @default(now())
   playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VersionHistory {
@@ -124,32 +105,17 @@ model VersionHistory {
   playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 }
 
-model NodeParameter {
-  id        String   @id
-  name      String
-  nodeId    String
-  type      String
-  mandatory Boolean
-  options   String[]
-  Node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
-}
-
 model DocumentImage {
   id         String   @id @default(uuid())
-  url        String   // URL to the stored image
-  alt        String?  // Accessibility text
-  caption    String?  // Optional image caption
-  
-  // Single relation approach - only one of these will be set
+  url        String
+  alt        String?
+  caption    String?
   playbookId String?
   playbook   Playbook? @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  
   processId  String?
   process    Process?  @relation(fields: [processId], references: [id], onDelete: Cascade)
-  
   nodeId     String?
   node       Node?     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
-  
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
@@ -158,5 +124,4 @@ enum Role {
   ADMIN
   PLAYBOOK_CREATOR
   COLLABORATOR
-  USER
 }

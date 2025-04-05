@@ -170,15 +170,15 @@ export default function newProcess () {
     }, []);
 
     return (
-        <div>
+        <div className="page-container">
            <NavBar/>
 
            {/* Main Container */}
-           <div className='flex flex-row'>
+           <div className="flex flex-row h-[calc(100vh-var(--navbar-height))]">
                 <Sidebar/>
 
                 {/* content*/}
-                <div className='main-container '>
+                <div className="main-container flex-1 overflow-y-auto">
                     {/* progress bar */}
                     <div className="steps">
                         <div className="step active">1. Assign a PIC</div>
@@ -187,7 +187,7 @@ export default function newProcess () {
                         <div className="step">4. Create Event</div>
                     </div>
 
-                    <div className='content-container'>
+                    <div className="content-container">
                         <div className='button-bar'>
                             <button onClick={() => handleAddParam()}>
                                 <img src="/plus.png" alt="add question" />
@@ -210,7 +210,7 @@ export default function newProcess () {
                     </div>
                 </div>
                 <Button onClick={() => handleSave()}
-                    className='fixed right-0 bottom-0 m-3'>
+                    className="fixed right-4 bottom-4">
                         Save
                 </Button>
            </div>

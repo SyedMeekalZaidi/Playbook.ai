@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         name,
         type,
         processId,
-        bpmnId
+        bpmnId: bpmnId || null
       }
     });
     
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, type } = body;
+    const { id, name, type, bpmnId } = body;
     
     if (!id) {
       return NextResponse.json({ error: 'Node ID is required' }, { status: 400 });
@@ -80,7 +80,8 @@ export async function PATCH(req: Request) {
       where: { id },
       data: {
         ...(name !== undefined && { name }),
-        ...(type !== undefined && { type })
+        ...(type !== undefined && { type }),
+        ...(bpmnId !== undefined && { bpmnId })
       }
     });
     

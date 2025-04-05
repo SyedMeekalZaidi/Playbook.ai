@@ -67,7 +67,7 @@ export default function AccountPage() {
   };
 
   return (
-    <div>
+    <div className="page-container">
       <NavBar />
       <div className={styles.accountContainer}>
         <div className={styles.accountBox}>

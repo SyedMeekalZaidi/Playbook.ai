@@ -1,20 +1,28 @@
-// src/app/layout.tsx
-import type { Metadata } from "next";
-import "../styles/globals.css";
+import './globals.css';
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import { ClientSessionProvider } from '@/components/ClientSessionProvider';
+
+// Font configuration
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "Process Mapping Tool",
-  description: "A tool for mapping processes with BPMN",
+  title: 'ROSE Playbook',
+  description: 'A simple process mapping tool',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={inter.className}>
+        <ClientSessionProvider>
+          {children}
+        </ClientSessionProvider>
+      </body>
     </html>
   );
 }

@@ -1,37 +1,36 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import NavBar from './../components/NavBar';
-import Login from './login/page';
+import { useAuth } from '@/components/ClientSessionProvider';
 
 export default function Home() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { session, isLoading } = useAuth();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (email === 'test@example.com' && password === 'password') {
-      setIsLoggedIn(true);
+  useEffect(() => {
+    // If user is already logged in, redirect to dashboard
+    if (!isLoading && session) {
       router.push('/dashboard');
-    } else {
-      alert('Invalid credentials');
+    } else if (!isLoading) {
+      // Otherwise, redirect to login
+      router.push('/login');
     }
-  };
+  }, [session, isLoading, router]);
 
   return (
     <div>
       {/* Include Header */}
       <NavBar />
-
       
-      {/* Directly use the Login component */}
-      <Login />
-
+      <div className="container mt-5">
+        <div className="text-center">
+          <h1>Welcome to Process Mapping Tool</h1>
+          <p>Loading...</p>
+        </div>
+      </div>
     </div>
   );
 }

@@ -5,12 +5,13 @@ import styles from './page.module.css';
 import NavBar from '../../components/NavBar';
 import { Modal, Button, Form } from 'react-bootstrap';
 import BpmnModelerComponent from '../../components/BpmnModeler';
-import { ProcessAPI, NodeAPI } from '../../services/api';
+import { ProcessAPI, NodeAPI, PlaybookAPI } from '../../services/api';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
 
 // Define debugging entry interface
 interface DebugEntry {
+  action: string;
   timestamp: Date;
   elementType: string;
   elementName: string;
@@ -38,7 +39,7 @@ export default function ModelerPage() {
   const modelerRef = useRef<any>(null);
   const [processName, setProcessName] = useState<string>('');
   const [processId, setProcessId] = useState<string>('');
-  const [playbookId, setPlaybookId] = useState<string>('demo-playbook-id');
+  const [playbookId, setPlaybookId] = useState<string>('test-playbook-id'); // Use fixed ID
   const [processes, setProcesses] = useState<any[]>([]);
   const [nodes, setNodes] = useState<any[]>([]);
   const [debugEntries, setDebugEntries] = useState<DebugEntry[]>([]);
@@ -48,6 +49,7 @@ export default function ModelerPage() {
   const [showSaveSuccess, setShowSaveSuccess] = useState<boolean>(false);
   const [saveMessage, setSaveMessage] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Set isClient to true after mounting on the client
   useEffect(() => {
@@ -67,34 +69,38 @@ export default function ModelerPage() {
   }, [loadError]);
   
   // Handle starting a new diagram with a name
-  const handleStartNewDiagram = () => {
+  const handleStartNewDiagram = async () => {
     if (!processName.trim()) return;
     
-    const newProcessId = `process-${Date.now()}`; // Generate stable ID
-    console.log("Starting new diagram with process ID:", newProcessId);
+    setIsLoading(true);
     
-    // Create initial process
-    const initialProcess = {
-      id: newProcessId,
-      name: processName,
-      playbookId: playbookId,
-      bpmnXml: null
-    };
-    
-    setProcessId(newProcessId);
-    setProcesses([initialProcess]);
-    setShowNameDialog(false);
-    
-    // Add debug entry
-    addDebugEntry({
-      action: 'CREATE',
-      timestamp: new Date(),
-      elementType: 'process',
-      elementName: processName,
-      bpmnId: 'Process_1',
-      dbId: newProcessId,
-      details: 'Created initial process'
-    });
+    try {
+      // Create process with the fixed playbookId - no need to ensure playbook exists
+      const newProcess = await ProcessAPI.create({
+        name: processName,
+        playbookId: playbookId,
+      });
+      
+      setProcessId(newProcess.id);
+      setProcesses([newProcess]);
+      setShowNameDialog(false);
+      
+      // Add debug entry
+      addDebugEntry({
+        action: 'CREATE',
+        timestamp: new Date(),
+        elementType: 'process',
+        elementName: processName,
+        bpmnId: 'Process_1',
+        dbId: newProcess.id,
+        details: 'Created initial process'
+      });
+    } catch (error) {
+      console.error("Error creating process:", error);
+      setLoadError("Failed to create process");
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   // Handle element selection
@@ -124,19 +130,17 @@ export default function ModelerPage() {
     console.log('Creating element:', data);
     
     try {
-      // Generate a new ID as if it came from the database
-      const newId = `db-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      
       if (data.type === 'process') {
-        // Add to processes state
-        const newProcess = {
-          id: newId,
+        // Create process in the database
+        const newProcess = await ProcessAPI.create({
           name: data.data.name || 'New Process',
           playbookId: playbookId,
           bpmnId: data.data.bpmnId,
-          bpmnXml: data.data.bpmnXml
-        };
+          bpmnXml: data.data.bpmnXml || null
+          // Remove description field
+        });
         
+        // Add to processes state
         setProcesses(prev => [...prev, newProcess]);
         
         addDebugEntry({
@@ -145,24 +149,20 @@ export default function ModelerPage() {
           elementType: 'process',
           elementName: data.data.name || 'New Process',
           bpmnId: data.data.bpmnId,
-          dbId: newId
+          dbId: newProcess.id
         });
         
-        return {
-          ...data.data,
-          id: newId,
-          bpmnId: data.data.bpmnId
-        };
+        return newProcess;
       } else {
-        // Add to nodes state
-        const newNode = { 
-          id: newId,
+        // Create node in the database
+        const newNode = await NodeAPI.create({
           name: data.data.name || 'New Node',
           type: data.data.type,
           processId: processId,
-          bpmnId: data.data.bpmnId 
-        };
+          bpmnId: data.data.bpmnId
+        });
         
+        // Add to nodes state
         setNodes(prev => [...prev, newNode]);
         
         addDebugEntry({
@@ -171,14 +171,10 @@ export default function ModelerPage() {
           elementType: data.data.type,
           elementName: data.data.name || 'New Node',
           bpmnId: data.data.bpmnId,
-          dbId: newId
+          dbId: newNode.id
         });
         
-        return {
-          ...data.data,
-          id: newId,
-          bpmnId: data.data.bpmnId
-        };
+        return newNode;
       }
     } catch (error) {
       console.error('Error creating element:', error);
@@ -192,29 +188,52 @@ export default function ModelerPage() {
     
     try {
       if (data.type === 'process') {
+        // Update process in database
+        const updatedProcess = await ProcessAPI.update({
+          id: data.id,
+          ...data.data
+        });
+        
+        // Update processes state
         setProcesses(prev => 
           prev.map(p => p.id === data.id ? { ...p, ...data.data } : p)
         );
+        
+        addDebugEntry({
+          action: 'UPDATE',
+          timestamp: new Date(),
+          elementType: data.type,
+          elementName: data.data.name || 'Unnamed Process',
+          bpmnId: 'N/A',
+          dbId: data.id,
+          details: `Updated: ${Object.keys(data.data).join(', ')}`
+        });
+        
+        return updatedProcess;
       } else {
+        // Update node in database
+        const updatedNode = await NodeAPI.update({
+          id: data.id,
+          ...data.data
+        });
+        
+        // Update nodes state
         setNodes(prev => 
           prev.map(n => n.id === data.id ? { ...n, ...data.data } : n)
         );
+        
+        addDebugEntry({
+          action: 'UPDATE',
+          timestamp: new Date(),
+          elementType: data.type,
+          elementName: data.data.name || 'Unnamed Element',
+          bpmnId: 'N/A',
+          dbId: data.id,
+          details: `Updated: ${Object.keys(data.data).join(', ')}`
+        });
+        
+        return updatedNode;
       }
-      
-      addDebugEntry({
-        action: 'UPDATE',
-        timestamp: new Date(),
-        elementType: data.type,
-        elementName: data.data.name || 'Unnamed Element',
-        bpmnId: 'N/A', // We don't always have this in updates
-        dbId: data.id,
-        details: `Updated: ${Object.keys(data.data).join(', ')}`
-      });
-      
-      return {
-        success: true,
-        id: data.id
-      };
     } catch (error) {
       console.error('Error updating element:', error);
       throw error;
@@ -227,10 +246,18 @@ export default function ModelerPage() {
     
     try {
       if (data.type === 'process') {
+        // Delete process from database
+        await ProcessAPI.delete(data.id);
+        
+        // Update processes state
         setProcesses(prev => 
           prev.filter(p => p.id !== data.id)
         );
       } else {
+        // Delete node from database
+        await NodeAPI.delete(data.id);
+        
+        // Update nodes state
         setNodes(prev => 
           prev.filter(n => n.id !== data.id)
         );
@@ -255,27 +282,55 @@ export default function ModelerPage() {
   };
   
   // Handle diagram save success
-  const handleSaveSuccess = (xml: string, databaseMappings: any[]) => {
+  const handleSaveSuccess = async (xml: string, databaseMappings: any[]) => {
     console.log('Saving diagram XML:', xml.substring(0, 100) + '...');
     
-    // Update the process with the latest BPMN XML
-    setProcesses(prev => 
-      prev.map(p => p.id === processId ? { ...p, bpmnXml: xml } : p)
-    );
-    
-    addDebugEntry({
-      action: 'SAVE',
-      timestamp: new Date(),
-      elementType: 'diagram',
-      elementName: processName,
-      bpmnId: 'Process_1',
-      dbId: processId,
-      details: `Saved diagram with ${databaseMappings.length} mapped elements`
-    });
-    
-    setSaveMessage(`Process "${processName}" saved successfully!`);
-    setShowSaveSuccess(true);
-    setTimeout(() => setShowSaveSuccess(false), 3000);
+    try {
+      // Update the process with the latest BPMN XML
+      if (processId) {
+        const updatedProcess = await ProcessAPI.update({
+          id: processId,
+          bpmnXml: xml
+        });
+        
+        // Update process in state
+        setProcesses(prev => 
+          prev.map(p => p.id === processId ? { ...p, bpmnXml: xml } : p)
+        );
+      }
+      
+      // Update any changed BPMN IDs in database
+      for (const mapping of databaseMappings) {
+        if (mapping.dbType === 'process') {
+          await ProcessAPI.update({
+            id: mapping.dbId,
+            bpmnId: mapping.bpmnId
+          });
+        } else {
+          await NodeAPI.update({
+            id: mapping.dbId,
+            bpmnId: mapping.bpmnId
+          });
+        }
+      }
+      
+      addDebugEntry({
+        action: 'SAVE',
+        timestamp: new Date(),
+        elementType: 'diagram',
+        elementName: processName,
+        bpmnId: 'Process_1',
+        dbId: processId,
+        details: `Saved diagram with ${databaseMappings.length} mapped elements`
+      });
+      
+      setSaveMessage(`Process "${processName}" saved successfully!`);
+      setShowSaveSuccess(true);
+      setTimeout(() => setShowSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('Error saving diagram:', error);
+      setLoadError('Failed to save diagram to database');
+    }
   };
   
   // Format timestamp for display
@@ -300,9 +355,9 @@ export default function ModelerPage() {
   };
 
   return (
-    <div>
+    <div className="page-container">
       <NavBar />
-      <main className={styles.main}>
+      <main className={`${styles.main} pt-4`}>
         <h1 className={styles.title}>BPMN Process Modeler</h1>
         <p className={styles.description}>
           Create and edit BPMN diagrams with database integration
@@ -327,8 +382,12 @@ export default function ModelerPage() {
               </Form.Group>
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="primary" onClick={handleStartNewDiagram} disabled={!processName.trim()}>
-                Create Diagram
+              <Button 
+                variant="primary" 
+                onClick={handleStartNewDiagram} 
+                disabled={!processName.trim() || isLoading}
+              >
+                {isLoading ? 'Creating...' : 'Create Diagram'}
               </Button>
             </Modal.Footer>
           </ClientOnlyModal>

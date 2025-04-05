@@ -41,11 +41,10 @@ The database is structured around several core entities:
 
 ### Core Entities
 
-1. **User**: System users with authentication and role-based access
-2. **Playbook**: Main container for process workflows
-3. **Process**: Individual workflows with hierarchical nesting capabilities
-4. **Node**: BPMN elements (tasks, events, gateways) within processes
-5. **Parameter**: Customizable fields for process configuration
+1. **Playbook**: Main container for process workflows
+2. **Process**: Individual workflows with hierarchical nesting capabilities
+3. **Node**: BPMN elements (tasks, events, gateways) within processes
+4. **Parameter**: Customizable fields for process configuration
 
 ### Key Relationships
 
@@ -57,6 +56,10 @@ The database is structured around several core entities:
 ## Database Connection
 
 The project uses Supabase as the database provider with Prisma as the ORM. Connection details are stored in the `.env` file:
+
+## User Management
+
+User information is managed entirely through Supabase Auth. Roles and metadata are stored in Supabase Auth's user metadata.
 
 
 

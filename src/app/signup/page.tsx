@@ -1,129 +1,255 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/ClientSessionProvider';
+import { Card, Form, Button, Container, Row, Col, Alert } from 'react-bootstrap';
+import Link from 'next/link';
+import Image from 'next/image';
+import { motion } from 'framer-motion';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import styles from '../../styles/Signup.module.css';
-import NavBar from '../../components/NavBar';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 export default function Signup() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('USER'); // Changed to uppercase
-  const [secretKey, setSecretKey] = useState(''); // New state for secret key
+  const [role, setRole] = useState('USER');
+  const [secretKey, setSecretKey] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: 'success' | 'error' | 'info' | 'warning' | '';
+    message: string;
+  }>({ type: '', message: '' });
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+  
+  const router = useRouter();
+  const { signUp } = useAuth();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setStatusMessage({ type: 'info', message: 'Creating your account...' });
 
+    // Form validation
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      setStatusMessage({ type: 'error', message: 'Passwords do not match' });
+      setIsLoading(false);
       return;
     }
 
-    // If role is ADMIN, check if secret key is provided
-    if (role === 'ADMIN' && !secretKey) {
-      alert('Please provide the secret key for admin signup');
+    if (password.length < 8) {
+      setStatusMessage({ type: 'error', message: 'Password must be at least 8 characters long' });
+      setIsLoading(false);
       return;
     }
 
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          role,
-          secretKey: role === 'ADMIN' ? secretKey : undefined // Include secretKey only for admin
-        })
-      });
+      const { user, error } = await signUp(email, password, role, secretKey);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Signup failed');
+      if (error) {
+        setStatusMessage({
+          type: 'error',
+          message: error.message || 'Failed to sign up'
+        });
+        return;
       }
 
-      alert('Account created successfully!');
-      router.push('/dashboard');
+      if (user) {
+        setStatusMessage({
+          type: 'success',
+          message: 'Account created successfully! Redirecting to login...'
+        });
+        
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
+      }
     } catch (error: any) {
-      alert(`Error: ${error.message || 'Signup failed'}`);
+      setStatusMessage({
+        type: 'error',
+        message: error.message || 'An unexpected error occurred'
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const togglePasswordVisibility = () => {
+    setPasswordVisible(!passwordVisible);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setConfirmPasswordVisible(!confirmPasswordVisible);
+  };
+
   return (
-    <div>
-      {/* Include Header */}
-      <NavBar />
-
-      <div className={styles.signupContainer}>
-        <div className={styles.signupBox}>
-          <h1 className={styles.title}>Sign Up</h1>
-          <form onSubmit={handleSignup}>
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className={styles.input}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className={styles.input}
-            />
-            <input
-              type="password"
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              className={styles.input}
-            />
-
-            {/* Role Selection */}
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value.toUpperCase())} // Convert to uppercase
-              required
-              className={styles.input}
-            >
-              <option value="USER">User</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-
-            {/* Secret Key Input (Only for Admin) */}
-            {role === 'ADMIN' && (
-              <input
-                type="password"
-                placeholder="Admin Secret Key"
-                value={secretKey}
-                onChange={(e) => setSecretKey(e.target.value)}
-                required
-                className={styles.input}
-              />
-            )}
-
-            <button type="submit" className={styles.button}>
-              Sign Up
-            </button>
-          </form>
-          <p className={styles.loginText}>
-            Already have an account?{' '}
-            <a onClick={() => router.push('/')} className={styles.link}>
-              Login
-            </a>
-          </p>
-        </div>
-      </div>
-    </div>
+    <Container fluid className="py-5 min-vh-100 d-flex align-items-center justify-content-center bg-light">
+      <Row className="w-100 justify-content-center my-4">
+        <Col xs={12} md={8} lg={6} xl={4}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Card className="shadow-lg border-0 rounded-lg overflow-hidden">
+              <Card.Header className="text-center bg-primary text-white p-4">
+                <div className="d-flex justify-content-center mb-2">
+                  <Image
+                    src="/rose-logo.svg"
+                    alt="ROSE Logo"
+                    width={60}
+                    height={60}
+                    className="rounded-circle bg-white p-2"
+                    priority
+                  />
+                </div>
+                <h2 className="font-weight-bold mb-0">Create Account</h2>
+                <p className="text-white-50 mb-0">Join ROSE Playbook today</p>
+              </Card.Header>
+              
+              <Card.Body className="p-4 p-lg-5">
+                {statusMessage.type && (
+                  <Alert variant={statusMessage.type} className="mb-4">
+                    {statusMessage.message}
+                  </Alert>
+                )}
+                
+                <Form onSubmit={handleSignup}>
+                  <Form.Group className="mb-4">
+                    <Form.Label className="fw-bold">Email address</Form.Label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light">
+                        <i className="bi bi-envelope"></i>
+                      </span>
+                      <Form.Control
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="name@example.com"
+                        required
+                        className="py-2"
+                      />
+                    </div>
+                  </Form.Group>
+                  
+                  <Form.Group className="mb-4">
+                    <Form.Label className="fw-bold">Password</Form.Label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light">
+                        <i className="bi bi-lock"></i>
+                      </span>
+                      <Form.Control
+                        type={passwordVisible ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Create a secure password"
+                        required
+                        className="py-2"
+                      />
+                      <Button 
+                        variant="outline-secondary"
+                        onClick={togglePasswordVisibility}
+                      >
+                        <i className={`bi ${passwordVisible ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                      </Button>
+                    </div>
+                    <Form.Text className="text-muted">
+                      Password must be at least 8 characters long.
+                    </Form.Text>
+                  </Form.Group>
+                  
+                  <Form.Group className="mb-4">
+                    <Form.Label className="fw-bold">Confirm Password</Form.Label>
+                    <div className="input-group">
+                      <span className="input-group-text bg-light">
+                        <i className="bi bi-lock-fill"></i>
+                      </span>
+                      <Form.Control
+                        type={confirmPasswordVisible ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm your password"
+                        required
+                        className="py-2"
+                      />
+                      <Button 
+                        variant="outline-secondary"
+                        onClick={toggleConfirmPasswordVisibility}
+                      >
+                        <i className={`bi ${confirmPasswordVisible ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                      </Button>
+                    </div>
+                  </Form.Group>
+                  
+                  <Form.Group className="mb-4">
+                    <Form.Label className="fw-bold">Role</Form.Label>
+                    <Form.Select 
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className="py-2"
+                    >
+                      <option value="USER">Regular User</option>
+                      <option value="PLAYBOOK_CREATOR">Playbook Creator</option>
+                      <option value="ADMIN">Administrator</option>
+                    </Form.Select>
+                  </Form.Group>
+                  
+                  {role === 'ADMIN' && (
+                    <Form.Group className="mb-4">
+                      <Form.Label className="fw-bold">Admin Secret Key</Form.Label>
+                      <div className="input-group">
+                        <span className="input-group-text bg-light">
+                          <i className="bi bi-key"></i>
+                        </span>
+                        <Form.Control
+                          type="password"
+                          value={secretKey}
+                          onChange={(e) => setSecretKey(e.target.value)}
+                          placeholder="Enter the admin secret key"
+                          required
+                          className="py-2"
+                        />
+                      </div>
+                    </Form.Group>
+                  )}
+                  
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button 
+                      variant="primary" 
+                      type="submit" 
+                      className="w-100 py-2 mt-2 mb-3"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          Creating Account...
+                        </>
+                      ) : 'Create Account'}
+                    </Button>
+                  </motion.div>
+                </Form>
+              </Card.Body>
+              
+              <Card.Footer className="bg-white text-center py-4 border-0">
+                <p className="mb-0">
+                  Already have an account?{' '}
+                  <motion.span whileHover={{ scale: 1.05 }}>
+                    <Link href="/login" className="text-primary fw-bold text-decoration-none">
+                      Log In
+                    </Link>
+                  </motion.span>
+                </p>
+              </Card.Footer>
+            </Card>
+          </motion.div>
+        </Col>
+      </Row>
+    </Container>
   );
 }

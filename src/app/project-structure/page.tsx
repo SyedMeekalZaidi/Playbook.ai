@@ -17,17 +17,17 @@ function ProjectStructure() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="page-container flex flex-col h-screen">
       {/* Navigation Bar */}
       <NavBar />
 
       {/* Body Section */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', backgroundColor: '#f9f9f9' }}>
+      <div className="flex flex-1 overflow-hidden bg-gray-50 pt-2">
         {/* Left Sidebar */}
         <Sidebar />
 
         {/* Main Content */}
-        <div style={{ flex: 1, padding: '20px', overflowY: 'auto' }}>
+        <div className="flex-1 p-5 overflow-y-auto">
           {/* Steps Section */}
           <div className="steps">
             <div className="step active">1. Assign a PIC</div>
