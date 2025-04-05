@@ -2,7 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import NavBar from "../../components/NavBar";
-import SideBar from "../../components/SideBar";
+import EnhancedSidebar from "../../components/EnhancedSidebar";
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
 import Modal from 'react-bootstrap/Modal';
@@ -10,8 +10,9 @@ import Form from 'react-bootstrap/Form';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Container from 'react-bootstrap/Container';
+import Spinner from 'react-bootstrap/Spinner';
+import { BsArrowRight } from 'react-icons/bs'; 
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { getSession } from 'next-auth/react';
 import { supabase } from '@/lib/supabase';
 
 interface Process {
@@ -23,6 +24,7 @@ interface Playbook {
     id: string;
     name: string;
     shortDescription?: string;
+    createdAt?: string;
 }
 
 interface User {
@@ -36,11 +38,14 @@ export default function Dashboard() {
     const [session, setSession] = useState<any>(null);
     const [processes, setProcesses] = useState<Process[]>([]);
     const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
+    const [playbooksLoading, setPlaybooksLoading] = useState<boolean>(true);
     const [user, setUser] = useState<User | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [playbookName, setPlaybookName] = useState('');
     const [playbookDescription, setPlaybookDescription] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
 
     // Fetch session data directly from Supabase
     useEffect(() => {
@@ -80,18 +85,24 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchPlaybooks = async () => {
             if (user) {
+                setPlaybooksLoading(true);
+                setError(null);
                 try {
                     // Fetch playbooks where user is owner
                     const { data, error } = await supabase
                         .from('Playbook')
-                        .select('*')
+                        .select('id, name, shortDescription, createdAt')
                         .eq('ownerId', user.id)
-                        .eq('isDeleted', false);
+                        .eq('isDeleted', false)
+                        .order('createdAt', { ascending: false });
                         
                     if (error) throw error;
                     setPlaybooks(data || []);
-                } catch (error) {
+                } catch (error: any) {
                     console.error("Error loading playbooks:", error);
+                    setError("Failed to load playbooks. Please try again.");
+                } finally {
+                    setPlaybooksLoading(false);
                 }
             }
         };
@@ -105,6 +116,7 @@ export default function Dashboard() {
         setShowCreateModal(false);
         setPlaybookName('');
         setPlaybookDescription('');
+        setError(null);
     };
 
     const handleShowModal = () => setShowCreateModal(true);
@@ -115,11 +127,13 @@ export default function Dashboard() {
         
         // Make sure we have a user ID
         if (!user?.id) {
-            console.error("Cannot create playbook: No user ID available");
+            setError("You must be logged in to create a playbook");
             return;
         }
 
         setIsLoading(true);
+        setError(null);
+        
         try {
             const response = await fetch('/api/playbook', {
                 method: 'POST',
@@ -129,7 +143,7 @@ export default function Dashboard() {
                 body: JSON.stringify({
                     name: playbookName,
                     shortDescription: playbookDescription || undefined,
-                    ownerId: user.id, // Ensure user ID is always set
+                    ownerId: user.id, 
                 }),
             });
 
@@ -140,22 +154,43 @@ export default function Dashboard() {
             
             const newPlaybook = await response.json();
             
-            setPlaybooks([...playbooks, newPlaybook]);
+            // Update the playbooks list with the new playbook at the beginning
+            setPlaybooks([newPlaybook, ...playbooks]);
             handleCloseModal();
         } catch (error: any) {
             console.error("Error creating playbook:", error);
-            // You could add an error state and display to user here
+            setError(error.message || "Failed to create playbook. Please try again.");
         } finally {
             setIsLoading(false);
         }
     };
 
+    const handleProcessSelect = (processId: string) => {
+        setSelectedProcessId(processId);
+        console.log(`Selected process: ${processId}`);
+        // You can add additional logic here, like fetching process details
+    };
+
+    const handleNodeSelect = (nodeId: string) => {
+        console.log(`Selected node: ${nodeId}`);
+        // You can add additional logic here, like fetching node details
+    };
+
     return (
         <div className="page-container bg-gray-50 min-h-screen">
             <NavBar />
-            <div className="flex pt-2">
-                <SideBar />
-                <Container className="py-4 px-4 lg:px-8">
+            <div className="d-flex flex-column flex-lg-row pt-2">
+                {/* Sidebar column */}
+                <div className="sidebar-column px-3 py-3">
+                    <EnhancedSidebar 
+                        userId={user?.id} 
+                        onSelectProcess={handleProcessSelect}
+                        onSelectNode={handleNodeSelect}
+                    />
+                </div>
+                
+                {/* Main content column */}
+                <Container className="py-4 px-4 flex-grow-1">
                     <div className="mb-6">
                         <h1 className="text-3xl font-bold text-gray-800">
                             Welcome, {user?.email?.split('@')[0] || 'User'}
@@ -164,37 +199,76 @@ export default function Dashboard() {
 
                     <section className="mb-8">
                         <div className="d-flex justify-content-between align-items-center mb-4">
-                            <h2 className="text-2xl font-semibold text-gray-700 m-0">Playbooks</h2>
+                            <h2 className="text-2xl font-semibold" style={{ color: '#14213D' }}>Playbooks</h2>
                             <Button 
                                 variant="primary" 
                                 onClick={handleShowModal}
-                                className="bg-blue-600 hover:bg-blue-700 border-0"
+                                className="border-0"
+                                style={{ backgroundColor: '#14213D', color: 'white' }}
                             >
                                 Create Playbook
                             </Button>
                         </div>
 
-                        {playbooks.length > 0 ? (
+                        {playbooksLoading ? (
+                            <div className="text-center py-8">
+                                <Spinner animation="border" role="status" style={{ color: '#FEC872' }}>
+                                    <span className="visually-hidden">Loading...</span>
+                                </Spinner>
+                                <p className="mt-2 text-gray-600">Loading your playbooks...</p>
+                            </div>
+                        ) : error ? (
+                            <div className="text-center py-8 bg-gray-100 rounded-lg">
+                                <p className="text-danger">{error}</p>
+                                <Button 
+                                    variant="primary" 
+                                    onClick={() => window.location.reload()}
+                                    style={{ backgroundColor: '#14213D', color: 'white', marginTop: '10px' }}
+                                >
+                                    Retry
+                                </Button>
+                            </div>
+                        ) : playbooks.length > 0 ? (
                             <Row xs={1} md={2} lg={3} className="g-4">
                                 {playbooks.map((playbook) => (
                                     <Col key={playbook.id}>
-                                        <Card className="h-100 shadow-sm hover:shadow-md transition-shadow">
-                                            <Card.Body>
-                                                <Card.Title className="text-xl">{playbook.name}</Card.Title>
+                                        <Card 
+                                            className="h-100 shadow-sm transition-all duration-200 cursor-pointer" 
+                                            onClick={() => router.push(`/playbook/${playbook.id}`)}
+                                            style={{ 
+                                                borderLeft: '4px solid #FEC872',
+                                                transform: 'translateY(0)',
+                                                transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out'
+                                            }}
+                                            onMouseOver={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(-5px)';
+                                                e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                                            }}
+                                            onMouseOut={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.12)';
+                                            }}
+                                        >
+                                            <Card.Body className="d-flex flex-column">
+                                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                                    <Card.Title className="text-xl mb-0" style={{ color: '#14213D' }}>
+                                                        {playbook.name}
+                                                    </Card.Title>
+                                                    <BsArrowRight style={{ color: '#FEC872', fontSize: '1.2rem' }} />
+                                                </div>
+                                                
                                                 {playbook.shortDescription && (
-                                                    <Card.Text className="text-muted">
+                                                    <Card.Text className="text-muted flex-grow-1">
                                                         {playbook.shortDescription}
                                                     </Card.Text>
                                                 )}
+                                                
+                                                <div className="mt-3 text-muted small">
+                                                    {playbook.createdAt && (
+                                                        <span>Created: {new Date(playbook.createdAt).toLocaleDateString()}</span>
+                                                    )}
+                                                </div>
                                             </Card.Body>
-                                            <Card.Footer className="bg-transparent border-0">
-                                                <Button 
-                                                    variant="outline-primary"
-                                                    onClick={() => router.push(`/playbook/${playbook.id}`)}
-                                                >
-                                                    Open
-                                                </Button>
-                                            </Card.Footer>
                                         </Card>
                                     </Col>
                                 ))}
@@ -202,7 +276,11 @@ export default function Dashboard() {
                         ) : (
                             <div className="text-center py-8 bg-gray-100 rounded-lg">
                                 <p className="text-gray-600 mb-4">You haven't created any playbooks yet</p>
-                                <Button variant="primary" onClick={handleShowModal}>
+                                <Button 
+                                    variant="primary" 
+                                    onClick={handleShowModal}
+                                    style={{ backgroundColor: '#14213D', color: 'white' }}
+                                >
                                     Create Your First Playbook
                                 </Button>
                             </div>
@@ -210,27 +288,57 @@ export default function Dashboard() {
                     </section>
 
                     <section className="mb-8">
-                        <h2 className="text-2xl font-semibold text-gray-700 mb-4">Processes</h2>
+                        <h2 className="text-2xl font-semibold mb-4" style={{ color: '#14213D' }}>Processes</h2>
                         <div className='d-flex flex-wrap gap-4'>
                             {processes.map((process: Process) => (
-                                <Card key={process.id} style={{ width: '18rem' }} className="shadow-sm">
+                                <Card 
+                                    key={process.id} 
+                                    style={{ 
+                                        width: '18rem',
+                                        borderLeft: '4px solid #FEC872',
+                                        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out'
+                                    }} 
+                                    className={`shadow-sm ${selectedProcessId === process.id ? 'border-primary' : ''}`}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-5px)';
+                                        e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.12)';
+                                    }}
+                                >
                                     <Card.Body>
-                                        <Card.Title>{process.name}</Card.Title>
+                                        <div className="d-flex justify-content-between align-items-center mb-3">
+                                            <Card.Title style={{ color: '#14213D' }}>{process.name}</Card.Title>
+                                            <BsArrowRight style={{ color: '#FEC872' }} />
+                                        </div>
                                         <Button 
                                             variant="outline-primary" 
                                             onClick={() => router.push(`/process/${process.id}`)}
+                                            style={{ borderColor: '#14213D', color: '#14213D' }}
                                         >
                                             View
                                         </Button>
                                     </Card.Body>
                                 </Card>
                             ))}
-                            <Card style={{ width: '18rem' }} className="border-dashed border-2 d-flex justify-content-center align-items-center">
+                            <Card 
+                                style={{ width: '18rem' }} 
+                                className="border-dashed border-2 d-flex justify-content-center align-items-center"
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#f8f8f8';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.backgroundColor = '';
+                                }}
+                            >
                                 <Card.Body className="text-center">
                                     <Button 
                                         variant="link" 
                                         onClick={() => router.push('/create-process')}
-                                        className="text-primary text-decoration-none"
+                                        className="text-decoration-none"
+                                        style={{ color: '#14213D' }}
                                     >
                                         <div className="mb-2">
                                             <i className="bi bi-plus-circle" style={{ fontSize: '2rem' }}></i>
@@ -246,11 +354,17 @@ export default function Dashboard() {
 
             {/* Create Playbook Modal */}
             <Modal show={showCreateModal} onHide={handleCloseModal} centered>
-                <Modal.Header closeButton>
+                <Modal.Header closeButton style={{ backgroundColor: '#14213D', color: 'white' }}>
                     <Modal.Title>Create New Playbook</Modal.Title>
                 </Modal.Header>
                 <Form onSubmit={handleCreatePlaybook}>
                     <Modal.Body>
+                        {error && (
+                            <div className="alert alert-danger" role="alert">
+                                {error}
+                            </div>
+                        )}
+                        
                         <Form.Group className="mb-3" controlId="playbookName">
                             <Form.Label>Name</Form.Label>
                             <Form.Control
@@ -284,8 +398,21 @@ export default function Dashboard() {
                             variant="primary" 
                             type="submit" 
                             disabled={!playbookName.trim() || isLoading}
+                            style={{ backgroundColor: '#14213D', color: 'white' }}
                         >
-                            {isLoading ? 'Creating...' : 'Create Playbook'}
+                            {isLoading ? (
+                                <>
+                                    <Spinner
+                                        as="span"
+                                        animation="border"
+                                        size="sm"
+                                        role="status"
+                                        aria-hidden="true"
+                                        className="me-2"
+                                    />
+                                    Creating...
+                                </>
+                            ) : 'Create Playbook'}
                         </Button>
                     </Modal.Footer>
                 </Form>

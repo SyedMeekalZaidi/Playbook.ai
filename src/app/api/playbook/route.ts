@@ -1,27 +1,48 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// Get a playbook by ID
+// Get a playbook by ID or get all playbooks for a user
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const userId = searchParams.get('userId');
     
-    if (!id) {
-      return NextResponse.json({ error: 'Playbook ID is required' }, { status: 400 });
+    // If ID is provided, get a specific playbook
+    if (id) {
+      const playbook = await prisma.playbook.findUnique({
+        where: { 
+          id,
+          isDeleted: false 
+        }
+      });
+      
+      if (!playbook) {
+        return NextResponse.json({ error: 'Playbook not found' }, { status: 404 });
+      }
+      
+      return NextResponse.json(playbook);
     }
     
-    const playbook = await prisma.playbook.findUnique({
-      where: { id }
-    });
-    
-    if (!playbook) {
-      return NextResponse.json({ error: 'Playbook not found' }, { status: 404 });
+    // If userId is provided, get all playbooks for that user
+    if (userId) {
+      const playbooks = await prisma.playbook.findMany({
+        where: {
+          ownerId: userId,
+          isDeleted: false
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+      
+      return NextResponse.json(playbooks);
     }
     
-    return NextResponse.json(playbook);
+    // If neither id nor userId is provided
+    return NextResponse.json({ error: 'Either playbook ID or user ID is required' }, { status: 400 });
   } catch (error: any) {
-    console.error('Error fetching playbook:', error);
+    console.error('Error fetching playbook(s):', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -32,46 +53,42 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { id, name, ownerId, shortDescription } = body;
     
+    // Validate required fields
     if (!name) {
       return NextResponse.json({ error: 'Playbook name is required' }, { status: 400 });
     }
     
-    // Find or create a default user if ownerId is not provided
-    let userId = ownerId;
-    
-    if (!userId) {
-      const defaultUser = await prisma.user.findFirst({
-        where: { role: 'ADMIN' }
-      });
-      
-      if (defaultUser) {
-        userId = defaultUser.id;
-      } else {
-        const newUser = await prisma.user.create({
-          data: {
-            email: 'admin@example.com',
-            password: 'admin-password', // In production, this should be hashed
-            role: 'ADMIN',
-            name: 'System Admin'
-          }
-        });
-        userId = newUser.id;
-      }
+    if (!ownerId) {
+      return NextResponse.json({ error: 'Owner ID is required' }, { status: 400 });
     }
     
-    // Create the playbook, optionally with the specific ID
+    // We'll skip the Supabase user verification since it requires admin privileges
+    // Instead, we'll trust the client-side authentication and the user ID it provides
+    
+    // Create the playbook with the provided owner ID
     const playbook = await prisma.playbook.create({
       data: {
-        ...(id && { id }), // Only include id if provided
+        ...(id && { id }), // Only include ID if provided
         name,
-        ownerId: userId,
+        ownerId,
         shortDescription: shortDescription || null,
+        isDeleted: false,
       }
     });
     
     return NextResponse.json(playbook, { status: 201 });
   } catch (error: any) {
     console.error('Error creating playbook:', error);
+    
+    // Handle specific database errors with more context
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: 'A playbook with this ID already exists' }, { status: 409 });
+    }
+    
+    if (error.code === 'P2003') {
+      return NextResponse.json({ error: 'The owner ID provided does not exist' }, { status: 400 });
+    }
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
