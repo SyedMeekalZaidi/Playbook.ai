@@ -45,9 +45,57 @@ export async function getServerUser() {
 }
 
 /**
+ * Get the current authenticated session from server components
+ */
+export async function getServerSession() {
+  try {
+    const supabaseServer = createServerComponentClient({ cookies });
+    const { data } = await supabaseServer.auth.getSession();
+    return { 
+      session: data.session, 
+      user: data.session?.user || null,
+      error: null 
+    };
+  } catch (error: any) {
+    console.error('Error getting server session:', error);
+    return { session: null, user: null, error: error.message };
+  }
+}
+
+/**
  * Check if a user has a specific role
  */
 export function hasRole(user: any, role: string): boolean {
   if (!user) return false;
   return user.user_metadata?.role === role;
+}
+
+/**
+ * Verifies if the session is valid and returns auth status
+ */
+export async function verifySession(req: NextRequest) {
+  try {
+    // Check for token in cookie rather than auth header
+    const cookieHeader = req.headers.get('cookie');
+    
+    if (!cookieHeader) {
+      return { authenticated: false, error: 'No cookies provided' };
+    }
+    
+    // Use supabase admin to verify the session without needing the token directly
+    const { data, error } = await supabase.auth.getUser();
+    
+    if (error || !data.user) {
+      return { authenticated: false, error: error?.message || 'Session invalid' };
+    }
+    
+    return { 
+      authenticated: true, 
+      user: data.user,
+      error: null 
+    };
+  } catch (error: any) {
+    console.error('Session verification error:', error);
+    return { authenticated: false, error: error.message };
+  }
 }

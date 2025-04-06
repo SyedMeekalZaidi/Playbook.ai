@@ -2,7 +2,8 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import NavBar from "../../components/NavBar";
-import EnhancedSidebar from "../../components/EnhancedSidebar";
+// TODO: Uncomment when sidebar errors are fixed
+// import EnhancedSidebar from "../../components/EnhancedSidebar";
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
 import Modal from 'react-bootstrap/Modal';
@@ -14,6 +15,7 @@ import Spinner from 'react-bootstrap/Spinner';
 import { BsArrowRight } from 'react-icons/bs'; 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/components/ClientSessionProvider';
 
 interface Process {
     id: string;
@@ -35,7 +37,7 @@ interface User {
 
 export default function Dashboard() {
     const router = useRouter();
-    const [session, setSession] = useState<any>(null);
+    const { user: authUser, session: authSession } = useAuth(); // Use the auth context instead of local state
     const [processes, setProcesses] = useState<Process[]>([]);
     const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
     const [playbooksLoading, setPlaybooksLoading] = useState<boolean>(true);
@@ -47,23 +49,17 @@ export default function Dashboard() {
     const [error, setError] = useState<string | null>(null);
     const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
 
-    // Fetch session data directly from Supabase
+    // Use auth context to set user info
     useEffect(() => {
-        const fetchUserData = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (user) {
-                setUser({
-                    id: user.id,
-                    email: user.email || '',
-                    role: user.user_metadata?.role || 'USER'
-                });
-                setSession({ user });
-            }
-        };
-        
-        fetchUserData();
-    }, []);
+        if (authUser) {
+            console.log('[Dashboard] Auth user available:', authUser.email);
+            setUser({
+                id: authUser.id,
+                email: authUser.email || '',
+                role: authUser.user_metadata?.role || 'USER'
+            });
+        }
+    }, [authUser]);
 
     // Fetch processes
     useEffect(() => {
@@ -81,36 +77,42 @@ export default function Dashboard() {
         fetchProcesses();
     }, []);
 
-    // Fetch playbooks
+    // Fetch playbooks via API instead of direct Supabase access
     useEffect(() => {
         const fetchPlaybooks = async () => {
-            if (user) {
-                setPlaybooksLoading(true);
-                setError(null);
-                try {
-                    // Fetch playbooks where user is owner
-                    const { data, error } = await supabase
-                        .from('Playbook')
-                        .select('id, name, shortDescription, createdAt')
-                        .eq('ownerId', user.id)
-                        .eq('isDeleted', false)
-                        .order('createdAt', { ascending: false });
-                        
-                    if (error) throw error;
-                    setPlaybooks(data || []);
-                } catch (error: any) {
-                    console.error("Error loading playbooks:", error);
-                    setError("Failed to load playbooks. Please try again.");
-                } finally {
-                    setPlaybooksLoading(false);
+            if (!user?.id) {
+                console.log('[Dashboard] No user ID available yet, skipping playbook fetch');
+                return;
+            }
+            
+            console.log('[Dashboard] Fetching playbooks for user:', user.id);
+            setPlaybooksLoading(true);
+            setError(null);
+            
+            try {
+                // Use the API endpoint instead of direct Supabase access
+                const response = await fetch(`/api/playbook?userId=${user.id}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch playbooks: ${response.status}`);
                 }
+                
+                const data = await response.json();
+                console.log('[Dashboard] Playbooks loaded:', data.length);
+                setPlaybooks(data || []);
+            } catch (error: any) {
+                console.error("[Dashboard] Error loading playbooks:", error);
+                setError("Failed to load playbooks. Please try again.");
+            } finally {
+                setPlaybooksLoading(false);
             }
         };
 
-        if (user) {
+        // Only fetch if we have a user ID
+        if (user?.id) {
             fetchPlaybooks();
         }
-    }, [user]);
+    }, [user?.id]); // Only depend on user.id, not the entire user object
 
     const handleCloseModal = () => {
         setShowCreateModal(false);
@@ -180,13 +182,18 @@ export default function Dashboard() {
         <div className="page-container bg-gray-50 min-h-screen">
             <NavBar />
             <div className="d-flex flex-column flex-lg-row pt-2">
-                {/* Sidebar column */}
+                {/* Sidebar column - commented until errors are fixed */}
                 <div className="sidebar-column px-3 py-3">
+                    {/* 
                     <EnhancedSidebar 
                         userId={user?.id} 
                         onSelectProcess={handleProcessSelect}
                         onSelectNode={handleNodeSelect}
                     />
+                    */}
+                    <div className="p-3 bg-light rounded">
+                        <p>Sidebar temporarily disabled</p>
+                    </div>
                 </div>
                 
                 {/* Main content column */}

@@ -46,10 +46,21 @@ export async function middleware(req: NextRequest) {
     const { data: { session } } = await supabase.auth.getSession();
     
     console.log(`[Middleware] Auth check for ${path}: Session exists: ${!!session}`);
-    
+
     // If we don't have a session and this isn't a public route, redirect to login
     if (!session) {
       console.log(`[Middleware] No session for protected route ${path}, redirecting to login`);
+      
+      // Check if this request already comes from a redirect attempt to prevent loops
+      const referer = req.headers.get('referer') || '';
+      const isFromLogin = referer.includes('/login');
+      
+      // If we're already coming from login and still have no session,
+      // something is wrong with auth flow - let the client handle it
+      if (isFromLogin && path !== '/login') {
+        console.log('[Middleware] Potential redirect loop detected, allowing client to handle');
+        return res;
+      }
       
       // Get the base URL for redirection
       const redirectUrl = req.nextUrl.clone();

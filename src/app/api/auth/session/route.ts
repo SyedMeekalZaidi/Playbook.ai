@@ -4,31 +4,35 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
+    // Using a simpler approach with a single client
+    // Create a response object first
+    const response = NextResponse.next();
+    
+    // Get the cookie store
     const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
     
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // Create the Supabase client with proper cookie handling
+    const supabase = createRouteHandlerClient({ 
+      cookies: () => cookieStore 
+    });
     
-    if (sessionError) {
-      console.error('Session fetch error:', sessionError);
-      return NextResponse.json({ error: 'Failed to fetch session' }, { status: 500 });
+    // Get the session directly
+    const { data, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('[API] Auth error:', error);
+      return NextResponse.json({ error: 'Authentication error', details: error }, { status: 500 });
     }
     
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError) {
-      console.error('User fetch error:', userError);
-      return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
-    }
-    
+    // Return session info with auth status
     return NextResponse.json({ 
-      session,
-      user,
-      authenticated: !!session,
+      session: data.session,
+      user: data.session?.user || null,
+      authenticated: !!data.session,
     });
     
   } catch (error) {
-    console.error('Session route error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[API] Session route error:', error);
+    return NextResponse.json({ error: 'Internal server error', details: error }, { status: 500 });
   }
 }

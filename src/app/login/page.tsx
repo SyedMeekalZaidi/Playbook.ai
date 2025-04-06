@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import { useAuth } from '@/components/ClientSessionProvider';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -24,8 +24,8 @@ export default function Login() {
   // Get the redirect path from URL params or default to dashboard
   const redirectTo = searchParams.get('redirectTo') || '/dashboard';
   
-  // Use our auth context instead of direct Supabase client
-  const { signIn } = useAuth();
+  // Create a Supabase client specifically for this component
+  const supabase = createClientComponentClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +33,10 @@ export default function Login() {
     setStatusMessage({ type: 'info', message: 'Logging in...' });
 
     try {
-      const { user, error } = await signIn(email, password);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
       if (error) {
         setStatusMessage({
@@ -44,13 +47,14 @@ export default function Login() {
         return;
       }
 
-      if (user) {
+      if (data?.user) {
         setStatusMessage({
           type: 'success',
           message: 'Login successful! Redirecting to dashboard...'
         });
         
-        // Auth provider will handle the redirection
+        // Do a hard navigation to ensure the session is picked up
+        window.location.href = redirectTo;
       }
     } catch (error: any) {
       setStatusMessage({
