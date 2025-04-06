@@ -12,7 +12,7 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Container from 'react-bootstrap/Container';
 import Spinner from 'react-bootstrap/Spinner';
-import { BsArrowRight } from 'react-icons/bs'; 
+import { BsArrowRight } from 'react-icons/bs';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/ClientSessionProvider';
@@ -84,19 +84,19 @@ export default function Dashboard() {
                 console.log('[Dashboard] No user ID available yet, skipping playbook fetch');
                 return;
             }
-            
+
             console.log('[Dashboard] Fetching playbooks for user:', user.id);
             setPlaybooksLoading(true);
             setError(null);
-            
+
             try {
                 // Use the API endpoint instead of direct Supabase access
                 const response = await fetch(`/api/playbook?userId=${user.id}`);
-                
+
                 if (!response.ok) {
                     throw new Error(`Failed to fetch playbooks: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
                 console.log('[Dashboard] Playbooks loaded:', data.length);
                 setPlaybooks(data || []);
@@ -126,7 +126,7 @@ export default function Dashboard() {
     const handleCreatePlaybook = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!playbookName.trim()) return;
-        
+
         // Make sure we have a user ID
         if (!user?.id) {
             setError("You must be logged in to create a playbook");
@@ -135,7 +135,7 @@ export default function Dashboard() {
 
         setIsLoading(true);
         setError(null);
-        
+
         try {
             const response = await fetch('/api/playbook', {
                 method: 'POST',
@@ -145,7 +145,7 @@ export default function Dashboard() {
                 body: JSON.stringify({
                     name: playbookName,
                     shortDescription: playbookDescription || undefined,
-                    ownerId: user.id, 
+                    ownerId: user.id,
                 }),
             });
 
@@ -153,9 +153,9 @@ export default function Dashboard() {
                 const errorData = await response.json();
                 throw new Error(errorData.error || "Failed to create playbook");
             }
-            
+
             const newPlaybook = await response.json();
-            
+
             // Update the playbooks list with the new playbook at the beginning
             setPlaybooks([newPlaybook, ...playbooks]);
             handleCloseModal();
@@ -184,9 +184,9 @@ export default function Dashboard() {
             <div className="d-flex flex-column flex-lg-row pt-2">
                 {/* Sidebar column - commented until errors are fixed */}
                 <div className="sidebar-column px-3 py-3">
-                    {/* 
-                    <EnhancedSidebar 
-                        userId={user?.id} 
+                    {/*
+                    <EnhancedSidebar
+                        userId={user?.id}
                         onSelectProcess={handleProcessSelect}
                         onSelectNode={handleNodeSelect}
                     />
@@ -195,7 +195,7 @@ export default function Dashboard() {
                         <p>Sidebar temporarily disabled</p>
                     </div>
                 </div>
-                
+
                 {/* Main content column */}
                 <Container className="py-4 px-4 flex-grow-1">
                     <div className="mb-6">
@@ -207,8 +207,8 @@ export default function Dashboard() {
                     <section className="mb-8">
                         <div className="d-flex justify-content-between align-items-center mb-4">
                             <h2 className="text-2xl font-semibold" style={{ color: '#14213D' }}>Playbooks</h2>
-                            <Button 
-                                variant="primary" 
+                            <Button
+                                variant="primary"
                                 onClick={handleShowModal}
                                 className="border-0"
                                 style={{ backgroundColor: '#14213D', color: 'white' }}
@@ -227,8 +227,8 @@ export default function Dashboard() {
                         ) : error ? (
                             <div className="text-center py-8 bg-gray-100 rounded-lg">
                                 <p className="text-danger">{error}</p>
-                                <Button 
-                                    variant="primary" 
+                                <Button
+                                    variant="primary"
                                     onClick={() => window.location.reload()}
                                     style={{ backgroundColor: '#14213D', color: 'white', marginTop: '10px' }}
                                 >
@@ -239,10 +239,10 @@ export default function Dashboard() {
                             <Row xs={1} md={2} lg={3} className="g-4">
                                 {playbooks.map((playbook) => (
                                     <Col key={playbook.id}>
-                                        <Card 
-                                            className="h-100 shadow-sm transition-all duration-200 cursor-pointer" 
+                                        <Card
+                                            className="h-100 shadow-sm transition-all duration-200 cursor-pointer"
                                             onClick={() => router.push(`/playbook/${playbook.id}`)}
-                                            style={{ 
+                                            style={{
                                                 borderLeft: '4px solid #FEC872',
                                                 transform: 'translateY(0)',
                                                 transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out'
@@ -263,13 +263,13 @@ export default function Dashboard() {
                                                     </Card.Title>
                                                     <BsArrowRight style={{ color: '#FEC872', fontSize: '1.2rem' }} />
                                                 </div>
-                                                
+
                                                 {playbook.shortDescription && (
                                                     <Card.Text className="text-muted flex-grow-1">
                                                         {playbook.shortDescription}
                                                     </Card.Text>
                                                 )}
-                                                
+
                                                 <div className="mt-3 text-muted small">
                                                     {playbook.createdAt && (
                                                         <span>Created: {new Date(playbook.createdAt).toLocaleDateString()}</span>
@@ -283,8 +283,8 @@ export default function Dashboard() {
                         ) : (
                             <div className="text-center py-8 bg-gray-100 rounded-lg">
                                 <p className="text-gray-600 mb-4">You haven't created any playbooks yet</p>
-                                <Button 
-                                    variant="primary" 
+                                <Button
+                                    variant="primary"
                                     onClick={handleShowModal}
                                     style={{ backgroundColor: '#14213D', color: 'white' }}
                                 >
@@ -298,13 +298,13 @@ export default function Dashboard() {
                         <h2 className="text-2xl font-semibold mb-4" style={{ color: '#14213D' }}>Processes</h2>
                         <div className='d-flex flex-wrap gap-4'>
                             {processes.map((process: Process) => (
-                                <Card 
-                                    key={process.id} 
-                                    style={{ 
+                                <Card
+                                    key={process.id}
+                                    style={{
                                         width: '18rem',
                                         borderLeft: '4px solid #FEC872',
                                         transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out'
-                                    }} 
+                                    }}
                                     className={`shadow-sm ${selectedProcessId === process.id ? 'border-primary' : ''}`}
                                     onMouseOver={(e) => {
                                         e.currentTarget.style.transform = 'translateY(-5px)';
@@ -320,9 +320,9 @@ export default function Dashboard() {
                                             <Card.Title style={{ color: '#14213D' }}>{process.name}</Card.Title>
                                             <BsArrowRight style={{ color: '#FEC872' }} />
                                         </div>
-                                        <Button 
-                                            variant="outline-primary" 
-                                            onClick={() => router.push(`/process/${process.id}`)}
+                                        <Button
+                                            variant="outline-primary"
+                                            onClick={() => router.push(`/processes/${process.id}`)}
                                             style={{ borderColor: '#14213D', color: '#14213D' }}
                                         >
                                             View
@@ -330,8 +330,8 @@ export default function Dashboard() {
                                     </Card.Body>
                                 </Card>
                             ))}
-                            <Card 
-                                style={{ width: '18rem' }} 
+                            <Card
+                                style={{ width: '18rem' }}
                                 className="border-dashed border-2 d-flex justify-content-center align-items-center"
                                 onMouseOver={(e) => {
                                     e.currentTarget.style.backgroundColor = '#f8f8f8';
@@ -341,9 +341,9 @@ export default function Dashboard() {
                                 }}
                             >
                                 <Card.Body className="text-center">
-                                    <Button 
-                                        variant="link" 
-                                        onClick={() => router.push('/create-process')}
+                                    <Button
+                                        variant="link"
+                                        onClick={() => router.push('/processes/new-process')}
                                         className="text-decoration-none"
                                         style={{ color: '#14213D' }}
                                     >
@@ -371,7 +371,7 @@ export default function Dashboard() {
                                 {error}
                             </div>
                         )}
-                        
+
                         <Form.Group className="mb-3" controlId="playbookName">
                             <Form.Label>Name</Form.Label>
                             <Form.Control
@@ -401,9 +401,9 @@ export default function Dashboard() {
                         <Button variant="secondary" onClick={handleCloseModal}>
                             Cancel
                         </Button>
-                        <Button 
-                            variant="primary" 
-                            type="submit" 
+                        <Button
+                            variant="primary"
+                            type="submit"
                             disabled={!playbookName.trim() || isLoading}
                             style={{ backgroundColor: '#14213D', color: 'white' }}
                         >

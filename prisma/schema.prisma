@@ -3,84 +3,101 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Playbook {
-  id               String                 @id @default(uuid())
-  name             String
-  shortDescription String?                @db.VarChar(280)
-  documentContent  Json?
-  ownerId          String                 // Supabase Auth user ID
-  isDeleted        Boolean                @default(false)
-  deletedAt        DateTime?
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  collaborators    PlaybookCollaborator[]
-  processes        Process[]
-  versionHistories VersionHistory[]
-  images           DocumentImage[]
-  sessions         CollaborationSession[] 
-  changeLogs       ChangeLog[]            
+  id                  String                 @id @default(uuid())
+  name                String
+  ownerId             String
+  isDeleted           Boolean                @default(false)
+  deletedAt           DateTime?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  documentContent     Json?
+  shortDescription    String?                @db.VarChar(280)
+  changeLogs          ChangeLog[]
+  sessions            CollaborationSession[]
+  images              DocumentImage[]
+  collaborators       PlaybookCollaborator[]
+  processes           Process[]
+  versionHistories    VersionHistory[]
+  processDependencies ProcessDependency[]
 }
 
 model PlaybookCollaborator {
   id         String   @id @default(uuid())
   playbookId String
-  userId     String   // Supabase Auth user ID
+  userId     String
   role       Role     @default(ADMIN)
   createdAt  DateTime @default(now())
   playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 }
 
 model Process {
-  id               String        @id @default(uuid())
+  id               String              @id @default(uuid())
   name             String
-  shortDescription String?       @db.VarChar(280)
-  documentContent  Json?
   playbookId       String
   parentId         String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  playbook         Playbook      @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  nodes            Node[]        
-  images           DocumentImage[] 
-  // Adding self-relation for parent-child processes if needed
-  parentProcess    Process?      @relation("ProcessToProcess", fields: [parentId], references: [id])
-  subProcesses     Process[]     @relation("ProcessToProcess")
+  documentContent  Json?
+  shortDescription String?             @db.VarChar(280)
+  parentProcess    Process?            @relation("ProcessToProcess", fields: [parentId], references: [id])
+  subProcesses     Process[]           @relation("ProcessToProcess")
+  nodes            Node[]
+  fromProcess      ProcessDependency[] @relation("FromProcess")
+  toProcess        ProcessDependency[] @relation("ToProcess")
+  images           DocumentImage[]
+  playbook         Playbook            @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
+model ProcessDependency {
+  id         String   @id @default(uuid())
+  fromId     String
+  toId       String
+  playbookId String
+  playbook   Playbook @relation(fields: [playbookId], references: [id])
+
+  fromProcess Process @relation("FromProcess", fields: [fromId], references: [id])
+  toProcess   Process @relation("ToProcess", fields: [toId], references: [id])
+
+  trigger String
+
+  @@unique([fromId, toId])
 }
 
 model Node {
   id               String          @id @default(uuid())
   name             String
-  shortDescription String?         @db.VarChar(280)
-  documentContent  Json?
   type             String?
-  bpmnId           String?
   processId        String
-  process          Process         @relation(fields: [processId], references: [id], onDelete: Cascade)
-  parameters       NodeParameter[]
   lockedById       String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+  documentContent  Json?
+  shortDescription String?         @db.VarChar(280)
+  bpmnId           String?
   images           DocumentImage[]
+  process          Process         @relation(fields: [processId], references: [id], onDelete: Cascade)
+  parameters       NodeParameter[]
 }
 
 model NodeParameter {
   id        String   @id @default(uuid())
   name      String
-  node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
   nodeId    String
   type      String
   mandatory Boolean
   options   String[]
+  node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 }
 
 model CollaborationSession {
   id         String    @id @default(uuid())
   playbookId String
-  userId     String    // Supabase Auth user ID
+  userId     String
   startedAt  DateTime  @default(now())
   endedAt    DateTime?
   playbook   Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
@@ -89,7 +106,7 @@ model CollaborationSession {
 model ChangeLog {
   id         String   @id @default(uuid())
   playbookId String
-  userId     String   // Supabase Auth user ID
+  userId     String
   action     String
   details    String?
   timestamp  DateTime @default(now())
@@ -106,18 +123,18 @@ model VersionHistory {
 }
 
 model DocumentImage {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   url        String
   alt        String?
   caption    String?
   playbookId String?
-  playbook   Playbook? @relation(fields: [playbookId], references: [id], onDelete: Cascade)
   processId  String?
-  process    Process?  @relation(fields: [processId], references: [id], onDelete: Cascade)
   nodeId     String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   node       Node?     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  playbook   Playbook? @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  process    Process?  @relation(fields: [processId], references: [id], onDelete: Cascade)
 }
 
 enum Role {
