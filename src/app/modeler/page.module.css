@@ -59,6 +59,27 @@
   position: relative;
 }
 
+/* Add styles for playbook selection */
+.playbookSelector {
+  margin-bottom: 16px;
+}
+
+.playbookSelectorLabel {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+/* Style for the no playbooks message */
+.noPlaybooksMessage {
+  background-color: #fff3cd;
+  border: 1px solid #ffecb5;
+  color: #856404;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
 .actionsBar {
   display: flex;
   justify-content: flex-end;

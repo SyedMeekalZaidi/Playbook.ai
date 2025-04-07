@@ -40,38 +40,57 @@ interface ProcessDependency {
 
 
 export async function POST(req: Request) {
-
   try {
-      const { processName, nodeList } = await req.json();
+    const { processName, nodeList, processParameters, playbookId = 'test-playbook-id' } = await req.json();
 
-      if (!processName) {
-          return NextResponse.json({ message: "Missing required fields(route.tsx)" }, { status: 400 });
-      }
+    if (!processName) {
+      return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
+    }
 
-      const newProcess = await prisma.process.create({
-        data: {
-            name: processName,
-            playbookId: 'test-playbook-id',
-            nodes: {
-                create: nodeList.map((node:Node) => ({
-                    name: node.name,
-                    type: node.type,
-                    parameters: {
-                        create: node.parameters.map((param: NodeParameter) => ({
-                            name: param.name,
-                            type: param.type,
-                            mandatory: param.mandatory
-                        }))
-                    }
-                }))
+    // Create process with nodes, parameters, and their relationships
+    const newProcess = await prisma.process.create({
+      data: {
+        name: processName,
+        playbookId,
+        // Add process parameters if provided
+        parameters: processParameters?.length > 0 ? {
+          create: processParameters.map((param: any) => ({
+            name: param.name,
+            type: param.type,
+            mandatory: param.mandatory,
+            options: param.options || []
+          }))
+        } : undefined,
+        // Add nodes with their parameters
+        nodes: {
+          create: nodeList.map((node: any) => ({
+            name: node.name,
+            type: node.type,
+            parameters: {
+              create: (node.parameters || []).map((param: any) => ({
+                name: param.name,
+                type: param.type,
+                mandatory: param.mandatory,
+                options: param.options || []
+              }))
             }
+          }))
         }
-      })
+      },
+      // Include related data in the response
+      include: {
+        parameters: true,
+        nodes: {
+          include: {
+            parameters: true
+          }
+        }
+      }
+    });
 
-      return NextResponse.json(newProcess, { status: 201 });
-
+    return NextResponse.json(newProcess, { status: 201 });
   } catch (error) {
-      console.error("Error creating process:", error);
-      return NextResponse.json({ message: "Internal Server Error(route)" }, { status: 500 });
+    console.error("Error creating process:", error);
+    return NextResponse.json({ message: "Internal Server Error", error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }

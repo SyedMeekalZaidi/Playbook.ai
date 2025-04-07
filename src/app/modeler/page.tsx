@@ -20,6 +20,20 @@ interface DebugEntry {
   details?: string;
 }
 
+// Define Playbook interface
+interface Playbook {
+  id: string;
+  name: string;
+}
+
+// Define mock user for demo purposes
+const DEFAULT_USER = {
+  id: 'default-user-id',
+  name: 'Demo User',
+  email: 'demo@example.com',
+  role: 'ADMIN'
+};
+
 // Create a client-only modal component to fix hydration issues
 const ClientOnlyModal = ({ children, ...props }: React.ComponentProps<typeof Modal>) => {
   const [isMounted, setIsMounted] = useState(false);
@@ -39,7 +53,8 @@ export default function ModelerPage() {
   const modelerRef = useRef<any>(null);
   const [processName, setProcessName] = useState<string>('');
   const [processId, setProcessId] = useState<string>('');
-  const [playbookId, setPlaybookId] = useState<string>('test-playbook-id'); // Use fixed ID
+  const [playbookId, setPlaybookId] = useState<string>('');
+  const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
   const [processes, setProcesses] = useState<any[]>([]);
   const [nodes, setNodes] = useState<any[]>([]);
   const [debugEntries, setDebugEntries] = useState<DebugEntry[]>([]);
@@ -50,11 +65,65 @@ export default function ModelerPage() {
   const [saveMessage, setSaveMessage] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingPlaybooks, setIsLoadingPlaybooks] = useState(false);
   
   // Set isClient to true after mounting on the client
   useEffect(() => {
     setIsClient(true);
+    
+    // Fetch playbooks when component mounts
+    fetchPlaybooks();
   }, []);
+  
+  // Fetch available playbooks
+  const fetchPlaybooks = async () => {
+    setIsLoadingPlaybooks(true);
+    try {
+      const fetchedPlaybooks = await PlaybookAPI.getAll();
+      console.log("Fetched playbooks:", fetchedPlaybooks);
+      
+      // Add a default playbook if none exists (for demo purposes)
+      if (!fetchedPlaybooks || fetchedPlaybooks.length === 0) {
+        try {
+          console.log("No playbooks found, creating a default playbook");
+          const defaultPlaybook = await PlaybookAPI.create({
+            name: 'Default Playbook',
+            ownerId: DEFAULT_USER.id,
+            shortDescription: 'A default playbook created for demonstration'
+          });
+          setPlaybooks([defaultPlaybook]);
+          setPlaybookId(defaultPlaybook.id);
+        } catch (createError) {
+          console.error("Error creating default playbook:", createError);
+        }
+      } else {
+        setPlaybooks(fetchedPlaybooks);
+        // If there are playbooks, set the first one as default
+        if (fetchedPlaybooks.length > 0) {
+          setPlaybookId(fetchedPlaybooks[0].id);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching playbooks:", error);
+      setLoadError("Failed to fetch playbooks. Creating a default one.");
+      
+      // Try to create a default playbook as fallback
+      try {
+        const defaultPlaybook = await PlaybookAPI.create({
+          name: 'Default Playbook',
+          ownerId: DEFAULT_USER.id,
+          shortDescription: 'A default playbook created after fetch error'
+        });
+        setPlaybooks([defaultPlaybook]);
+        setPlaybookId(defaultPlaybook.id);
+      } catch (createError) {
+        console.error("Error creating fallback playbook:", createError);
+        setLoadError("Failed to create a default playbook. Please refresh the page or contact support.");
+      }
+    } finally {
+      setIsLoadingPlaybooks(false);
+    }
+  };
   
   // Helper to add debug entries
   const addDebugEntry = (entry: DebugEntry) => {
@@ -70,12 +139,15 @@ export default function ModelerPage() {
   
   // Handle starting a new diagram with a name
   const handleStartNewDiagram = async () => {
-    if (!processName.trim()) return;
+    if (!processName.trim() || !playbookId) return;
     
     setIsLoading(true);
     
     try {
-      // Create process with the fixed playbookId - no need to ensure playbook exists
+      // Check if the selected playbook exists
+      console.log("Creating process with playbookId:", playbookId);
+      
+      // Create process with the selected playbookId
       const newProcess = await ProcessAPI.create({
         name: processName,
         playbookId: playbookId,
@@ -93,11 +165,11 @@ export default function ModelerPage() {
         elementName: processName,
         bpmnId: 'Process_1',
         dbId: newProcess.id,
-        details: 'Created initial process'
+        details: `Created initial process in playbook: ${playbookId}`
       });
     } catch (error) {
       console.error("Error creating process:", error);
-      setLoadError("Failed to create process");
+      setLoadError("Failed to create process. Please check if the playbook exists.");
     } finally {
       setIsLoading(false);
     }
@@ -370,22 +442,55 @@ export default function ModelerPage() {
               <Modal.Title>New BPMN Diagram</Modal.Title>
             </Modal.Header>
             <Modal.Body>
-              <Form.Group className="mb-3">
-                <Form.Label>Enter a name for your process:</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={processName}
-                  onChange={(e) => setProcessName(e.target.value)}
-                  placeholder="My Business Process"
-                  autoFocus
-                />
-              </Form.Group>
+              {isLoadingPlaybooks ? (
+                <div className="text-center my-4">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-2">Loading playbooks...</p>
+                </div>
+              ) : (
+                <>
+                  {playbooks.length > 0 ? (
+                    <Form.Group className="mb-3">
+                      <Form.Label>Select a playbook:</Form.Label>
+                      <Form.Select
+                        value={playbookId}
+                        onChange={(e) => setPlaybookId(e.target.value)}
+                      >
+                        {playbooks.map(pb => (
+                          <option key={pb.id} value={pb.id}>{pb.name}</option>
+                        ))}
+                      </Form.Select>
+                      <div className="text-muted small mt-1">
+                        Total playbooks: {playbooks.length}
+                      </div>
+                    </Form.Group>
+                  ) : (
+                    <div className="alert alert-warning">
+                      No playbooks available. Creating a default playbook...
+                    </div>
+                  )}
+                  
+                  <Form.Group className="mb-3">
+                    <Form.Label>Enter a name for your process:</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={processName}
+                      onChange={(e) => setProcessName(e.target.value)}
+                      placeholder="My Business Process"
+                      autoFocus
+                      disabled={!playbookId}
+                    />
+                  </Form.Group>
+                </>
+              )}
             </Modal.Body>
             <Modal.Footer>
               <Button 
                 variant="primary" 
                 onClick={handleStartNewDiagram} 
-                disabled={!processName.trim() || isLoading}
+                disabled={!processName.trim() || !playbookId || isLoading || isLoadingPlaybooks}
               >
                 {isLoading ? 'Creating...' : 'Create Diagram'}
               </Button>
@@ -415,6 +520,7 @@ export default function ModelerPage() {
               <h2>{processName}</h2>
               <div className={styles.processInfo}>
                 <span>Process ID: {processId}</span>
+                <span>Playbook: {playbooks.find(p => p.id === playbookId)?.name || playbookId}</span>
                 <span>Nodes: {nodes.length}</span>
               </div>
             </div>

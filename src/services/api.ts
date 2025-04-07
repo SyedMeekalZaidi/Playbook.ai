@@ -200,40 +200,97 @@ export const NodeAPI = {
 
 // Playbook API Service
 export const PlaybookAPI = {
-  // Get a playbook by ID
-  async getById(id: string) {
+  // Get all playbooks
+  async getAll() {
     try {
-      const response = await fetch(`/api/playbook?id=${id}`);
-      if (!response.ok) throw new Error('Failed to fetch playbook');
+      // Use the correct API route for playbooks
+      const response = await fetch('/api/playbooks');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       return await response.json();
     } catch (error) {
-      console.error('Error fetching playbook:', error);
+      console.error('Error fetching playbooks:', error);
       throw error;
     }
   },
-
-  // Create a new playbook with specified ID
-  async create(data: {
-    id: string;
-    name: string;
-    ownerId?: string;
-    shortDescription?: string;
-  }) {
+  
+  // Get a specific playbook by ID
+  async getById(id: string) {
+    try {
+      const response = await fetch(`/api/playbook?id=${id}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching playbook with ID ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  // Create a new playbook
+  async create(data: { name: string, ownerId: string, shortDescription?: string }) {
     try {
       const response = await fetch('/api/playbook', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create playbook');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       return await response.json();
     } catch (error) {
       console.error('Error creating playbook:', error);
+      throw error;
+    }
+  },
+  
+  // Update a playbook
+  async update(data: { id: string, name?: string, shortDescription?: string }) {
+    try {
+      const response = await fetch('/api/playbook', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Error updating playbook with ID ${data.id}:`, error);
+      throw error;
+    }
+  },
+  
+  // Delete a playbook
+  async delete(id: string) {
+    try {
+      const response = await fetch(`/api/playbook?id=${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Error deleting playbook with ID ${id}:`, error);
       throw error;
     }
   },

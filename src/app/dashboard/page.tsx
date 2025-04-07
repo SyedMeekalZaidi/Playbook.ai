@@ -13,6 +13,7 @@ import Col from 'react-bootstrap/Col';
 import Container from 'react-bootstrap/Container';
 import Spinner from 'react-bootstrap/Spinner';
 import { BsArrowRight } from 'react-icons/bs';
+import { FiFileText, FiSettings } from 'react-icons/fi';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/ClientSessionProvider';
@@ -178,6 +179,27 @@ export default function Dashboard() {
         // You can add additional logic here, like fetching node details
     };
 
+    // Add a function to check if a process has parameters
+    const checkProcessParameters = async (processId: string) => {
+        try {
+            const response = await fetch(`/api/process/parameters?processId=${processId}`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch process parameters');
+            }
+            const data = await response.json();
+            return data.length > 0;
+        } catch (error) {
+            console.error("Error checking process parameters:", error);
+            return false;
+        }
+    };
+
+    // Update the handleParametersClick function to point to the new page
+    const handleParametersClick = async (processId: string) => {
+        // Now we just direct to the combined process page
+        router.push(`/processes/process?id=${processId}`);
+    };
+
     return (
         <div className="page-container bg-gray-50 min-h-screen">
             <NavBar />
@@ -320,13 +342,31 @@ export default function Dashboard() {
                                             <Card.Title style={{ color: '#14213D' }}>{process.name}</Card.Title>
                                             <BsArrowRight style={{ color: '#FEC872' }} />
                                         </div>
-                                        <Button
-                                            variant="outline-primary"
-                                            onClick={() => router.push(`/processes/${process.id}`)}
-                                            style={{ borderColor: '#14213D', color: '#14213D' }}
-                                        >
-                                            View
-                                        </Button>
+
+                                        {/* Action buttons */}
+                                        <div className="d-flex justify-content-between mt-3">
+                                            <Button
+                                                variant="outline-secondary"
+                                                size="sm"
+                                                onClick={() => router.push(`/processes/${process.id}/docs`)}
+                                                className="d-flex align-items-center"
+                                                style={{ borderColor: '#14213D', color: '#14213D' }}
+                                            >
+                                                <FiFileText className="me-1" /> Docs
+                                            </Button>
+
+                                            <Button
+                                                variant="outline-primary"
+                                                size="sm"
+                                                onClick={() => handleParametersClick(process.id)}
+                                                className="d-flex align-items-center"
+                                                style={{ borderColor: '#FEC872', color: '#14213D' }}
+                                            >
+                                                <FiSettings className="me-1" /> Parameters
+                                            </Button>
+                                        </div>
+                                        
+                                        {/* Removed the View button */}
                                     </Card.Body>
                                 </Card>
                             ))}
@@ -343,7 +383,7 @@ export default function Dashboard() {
                                 <Card.Body className="text-center">
                                     <Button
                                         variant="link"
-                                        onClick={() => router.push('/processes/new-process')}
+                                        onClick={() => router.push('/processes/process')}
                                         className="text-decoration-none"
                                         style={{ color: '#14213D' }}
                                     >

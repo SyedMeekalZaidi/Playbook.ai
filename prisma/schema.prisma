@@ -51,6 +51,21 @@ model Process {
   playbook         Playbook            @relation(fields: [playbookId], references: [id], onDelete: Cascade)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
+  parameters       ProcessParameter[]  @relation("ProcessToParameter")
+  bpmnXml          String?             @db.Text
+  bpmnId           String?
+}
+
+model ProcessParameter {
+  id        String   @id @default(uuid())
+  name      String
+  processId String?
+  nodeId    String?
+  type      String
+  mandatory Boolean
+  options   String[]
+  process   Process? @relation("ProcessToParameter", fields: [processId], references: [id], onDelete: Cascade)
+  node      Node?    @relation("NodeToParameter", fields: [nodeId], references: [id], onDelete: Cascade)
 }
 
 model ProcessDependency {
@@ -69,29 +84,19 @@ model ProcessDependency {
 }
 
 model Node {
-  id               String          @id @default(uuid())
+  id               String            @id @default(uuid())
   name             String
   type             String?
   processId        String
   lockedById       String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   documentContent  Json?
-  shortDescription String?         @db.VarChar(280)
+  shortDescription String?           @db.VarChar(280)
   bpmnId           String?
   images           DocumentImage[]
-  process          Process         @relation(fields: [processId], references: [id], onDelete: Cascade)
-  parameters       NodeParameter[]
-}
-
-model NodeParameter {
-  id        String   @id @default(uuid())
-  name      String
-  nodeId    String
-  type      String
-  mandatory Boolean
-  options   String[]
-  node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  process          Process           @relation(fields: [processId], references: [id], onDelete: Cascade)
+  parameters       ProcessParameter[] @relation("NodeToParameter")
 }
 
 model CollaborationSession {

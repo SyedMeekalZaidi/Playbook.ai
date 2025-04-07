@@ -92,3 +92,77 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+// Update a playbook
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json();
+    const { id, name, shortDescription } = body;
+    
+    // Validate ID
+    if (!id) {
+      return NextResponse.json({ error: 'Playbook ID is required' }, { status: 400 });
+    }
+    
+    // Check if playbook exists
+    const existingPlaybook = await prisma.playbook.findUnique({
+      where: { id, isDeleted: false }
+    });
+    
+    if (!existingPlaybook) {
+      return NextResponse.json({ error: 'Playbook not found' }, { status: 404 });
+    }
+    
+    // Update the playbook
+    const updatedPlaybook = await prisma.playbook.update({
+      where: { id },
+      data: {
+        ...(name && { name }),
+        ...(shortDescription !== undefined && { shortDescription }),
+      }
+    });
+    
+    return NextResponse.json(updatedPlaybook);
+  } catch (error: any) {
+    console.error('Error updating playbook:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// Delete a playbook (soft delete)
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Playbook ID is required' }, { status: 400 });
+    }
+    
+    // Check if playbook exists
+    const existingPlaybook = await prisma.playbook.findUnique({
+      where: { id, isDeleted: false }
+    });
+    
+    if (!existingPlaybook) {
+      return NextResponse.json({ error: 'Playbook not found or already deleted' }, { status: 404 });
+    }
+    
+    // Soft delete the playbook
+    const deletedPlaybook = await prisma.playbook.update({
+      where: { id },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date()
+      }
+    });
+    
+    return NextResponse.json({ 
+      message: `Playbook "${deletedPlaybook.name}" has been deleted`,
+      success: true 
+    });
+  } catch (error: any) {
+    console.error('Error deleting playbook:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

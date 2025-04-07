@@ -97,11 +97,11 @@ export default function Signup() {
               <Card.Header className="text-center bg-primary text-white p-4">
                 <div className="d-flex justify-content-center mb-2">
                   <Image
-                    src="/rose-logo.svg"
+                    src="/rose-logo.png"
                     alt="ROSE Logo"
                     width={60}
                     height={60}
-                    className="rounded-circle bg-white p-2"
+                    className="rounded-circle bg-blue-900 p-2"
                     priority
                   />
                 </div>
