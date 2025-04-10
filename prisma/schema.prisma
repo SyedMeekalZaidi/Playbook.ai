@@ -22,8 +22,8 @@ model Playbook {
   images              DocumentImage[]
   collaborators       PlaybookCollaborator[]
   processes           Process[]
-  versionHistories    VersionHistory[]
   processDependencies ProcessDependency[]
+  versionHistories    VersionHistory[]
 }
 
 model PlaybookCollaborator {
@@ -40,20 +40,20 @@ model Process {
   name             String
   playbookId       String
   parentId         String?
-  documentContent  Json?
-  shortDescription String?             @db.VarChar(280)
-  parentProcess    Process?            @relation("ProcessToProcess", fields: [parentId], references: [id])
-  subProcesses     Process[]           @relation("ProcessToProcess")
-  nodes            Node[]
-  fromProcess      ProcessDependency[] @relation("FromProcess")
-  toProcess        ProcessDependency[] @relation("ToProcess")
-  images           DocumentImage[]
-  playbook         Playbook            @relation(fields: [playbookId], references: [id], onDelete: Cascade)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
-  parameters       ProcessParameter[]  @relation("ProcessToParameter")
-  bpmnXml          String?             @db.Text
+  documentContent  Json?
+  shortDescription String?             @db.VarChar(280)
   bpmnId           String?
+  bpmnXml          String?
+  images           DocumentImage[]
+  nodes            Node[]
+  parentProcess    Process?            @relation("ProcessToProcess", fields: [parentId], references: [id])
+  subProcesses     Process[]           @relation("ProcessToProcess")
+  playbook         Playbook            @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  fromProcess      ProcessDependency[] @relation("FromProcess")
+  toProcess        ProcessDependency[] @relation("ToProcess")
+  parameters       ProcessParameter[]  @relation("ProcessToParameter")
 }
 
 model ProcessParameter {
@@ -64,38 +64,36 @@ model ProcessParameter {
   type      String
   mandatory Boolean
   options   String[]
+  node      Node    @relation("NodeToParameter", fields: [nodeId], references: [id], onDelete: Cascade)
   process   Process? @relation("ProcessToParameter", fields: [processId], references: [id], onDelete: Cascade)
-  node      Node?    @relation("NodeToParameter", fields: [nodeId], references: [id], onDelete: Cascade)
 }
 
 model ProcessDependency {
-  id         String   @id @default(uuid())
-  fromId     String
-  toId       String
-  playbookId String
-  playbook   Playbook @relation(fields: [playbookId], references: [id])
-
-  fromProcess Process @relation("FromProcess", fields: [fromId], references: [id])
-  toProcess   Process @relation("ToProcess", fields: [toId], references: [id])
-
-  trigger String
+  id          String   @id @default(uuid())
+  fromId      String
+  toId        String
+  playbookId  String
+  trigger     String
+  fromProcess Process  @relation("FromProcess", fields: [fromId], references: [id])
+  playbook    Playbook @relation(fields: [playbookId], references: [id])
+  toProcess   Process  @relation("ToProcess", fields: [toId], references: [id])
 
   @@unique([fromId, toId])
 }
 
 model Node {
-  id               String            @id @default(uuid())
+  id               String             @id @default(uuid())
   name             String
   type             String?
   processId        String
   lockedById       String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
   documentContent  Json?
-  shortDescription String?           @db.VarChar(280)
+  shortDescription String?            @db.VarChar(280)
   bpmnId           String?
   images           DocumentImage[]
-  process          Process           @relation(fields: [processId], references: [id], onDelete: Cascade)
+  process          Process            @relation(fields: [processId], references: [id], onDelete: Cascade)
   parameters       ProcessParameter[] @relation("NodeToParameter")
 }
 

@@ -12,11 +12,11 @@ export async function GET(request: Request) {
       const process = await prisma.process.findUnique({
         where: { id },
         include: {
-          nodes: {
-            include: {
-              parameters: true // Make sure to include parameters for each node
-            }
-          },
+          // nodes: {
+          //   include: {
+          //       // parameters: true // Ensure this relation exists in the schema before including it
+          //   }
+          // },
           parameters: true  // Include process parameters
         }
       });

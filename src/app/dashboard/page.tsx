@@ -17,6 +17,7 @@ import { FiFileText, FiSettings } from 'react-icons/fi';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/ClientSessionProvider';
+import EnhancedSidebar from '@/components/EnhancedSidebar';
 
 interface Process {
     id: string;
@@ -206,16 +207,13 @@ export default function Dashboard() {
             <div className="d-flex flex-column flex-lg-row pt-2">
                 {/* Sidebar column - commented until errors are fixed */}
                 <div className="sidebar-column px-3 py-3">
-                    {/*
+                    {
                     <EnhancedSidebar
                         userId={user?.id}
                         onSelectProcess={handleProcessSelect}
                         onSelectNode={handleNodeSelect}
                     />
-                    */}
-                    <div className="p-3 bg-light rounded">
-                        <p>Sidebar temporarily disabled</p>
-                    </div>
+                    }
                 </div>
 
                 {/* Main content column */}

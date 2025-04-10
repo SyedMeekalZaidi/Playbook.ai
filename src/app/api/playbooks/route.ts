@@ -4,19 +4,29 @@ import { prisma } from '@/lib/prisma';
 // Get all playbooks (non-deleted ones)
 export async function GET(req: Request) {
   try {
-    // Get all active playbooks
+    // Defensive check: ensure Prisma is initialized
+    if (!prisma || !prisma.playbook) {
+      console.error("Prisma client or playbook model not available.");
+      return NextResponse.json({ error: "Server misconfiguration." }, { status: 500 });
+    }
+
+    // Fetch active playbooks
     const playbooks = await prisma.playbook.findMany({
       where: {
-        isDeleted: false
+        isDeleted: false,
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
-    
-    return NextResponse.json(playbooks);
+
+    // If no playbooks found, return empty array
+    return NextResponse.json(playbooks || []);
   } catch (error: any) {
     console.error('Error fetching playbooks:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch playbooks. Please try again later.' },
+      { status: 500 }
+    );
   }
 }
