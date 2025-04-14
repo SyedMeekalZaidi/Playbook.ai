@@ -26,23 +26,21 @@ const ProcessTree: React.FC<ProcessTreeProps> = ({
   } = useProcessTree();
 
   useEffect(() => {
-    fetchTreeData(playbookId);
-  }, [playbookId, fetchTreeData]);
+    if (playbookId) {
+      fetchTreeData(playbookId);
+    }
+  }, [playbookId]);
 
-  // Build the process tree structure
   const buildProcessTree = () => {
-    if (!processes.length) return [];
-    
     type TreeProcess = typeof processes[number] & {
       subProcesses: TreeProcess[];
       nodes: typeof nodes;
     };
-    
+
     const processMap = new Map<string, TreeProcess>();
     const rootProcesses: TreeProcess[] = [];
-    
-    
-    // First pass: create process objects with empty children arrays
+
+    // First pass: enrich each process
     processes.forEach(process => {
       processMap.set(process.id, {
         ...process,
@@ -50,21 +48,24 @@ const ProcessTree: React.FC<ProcessTreeProps> = ({
         nodes: nodes.filter(node => node.processId === process.id)
       });
     });
-    
-    // Second pass: build the tree structure
+
+    // Second pass: link parent-child
     processes.forEach(process => {
-      const processWithData = processMap.get(process.id);
-      
-      if (process.parentId && processMap.has(process.parentId)) {
-        // Add as child to parent
-        const parentProcess = processMap.get(process.parentId);
-        parentProcess.subProcesses.push(processWithData);
+      const current = processMap.get(process.id);
+      if (!current) return;
+
+      if (process.parentId) {
+        const parent = processMap.get(process.parentId);
+        if (parent) {
+          parent.subProcesses.push(current);
+        } else {
+          rootProcesses.push(current); // fallback to root if parent not found
+        }
       } else {
-        // Add to root processes
-        rootProcesses.push(processWithData);
+        rootProcesses.push(current);
       }
     });
-    
+
     return rootProcesses;
   };
 
@@ -72,20 +73,16 @@ const ProcessTree: React.FC<ProcessTreeProps> = ({
     e.stopPropagation();
     setActiveItem(processId);
     toggleProcessExpand(processId);
-    if (onSelectProcess) {
-      onSelectProcess(processId);
-    }
+    onSelectProcess?.(processId);
   };
 
   const handleNodeClick = (e: React.MouseEvent, nodeId: string) => {
     e.stopPropagation();
     setActiveItem(nodeId);
-    if (onSelectNode) {
-      onSelectNode(nodeId);
-    }
+    onSelectNode?.(nodeId);
   };
 
-  const getNodeIcon = (type: string | undefined) => {
+  const getNodeIcon = (type?: string) => {
     switch (type?.toLowerCase()) {
       case 'task':
       case 'usertask':
@@ -107,39 +104,33 @@ const ProcessTree: React.FC<ProcessTreeProps> = ({
     }
   };
 
-  const renderProcessTree = (processes: any[], depth = 0) => {
-    return processes.map(process => {
+  const renderProcessTree = (items: ReturnType<typeof buildProcessTree>, depth = 0): JSX.Element[] => {
+    return items.map(process => {
       const isExpanded = expandedProcesses.has(process.id);
-      const hasChildren = (process.subProcesses && process.subProcesses.length > 0) || 
-                          (process.nodes && process.nodes.length > 0);
       const isActive = activeItemId === process.id;
-      
+      const hasChildren = process.subProcesses.length > 0 || process.nodes.length > 0;
+
       return (
         <li 
           key={process.id} 
           className={`sidebar-item process-item ${isActive ? 'active' : ''}`}
           style={{ paddingLeft: `${depth * 8 + 16}px` }}
         >
-          <div 
-            className="collapsible" 
-            onClick={(e) => handleProcessClick(e, process.id)}
-          >
+          <div className="collapsible" onClick={(e) => handleProcessClick(e, process.id)}>
             <span className="item-name">{process.name}</span>
             {hasChildren && (
-              <span className={`expand-icon ${isExpanded ? '' : 'collapsed'}`}>
-                ▾
-              </span>
+              <span className={`expand-icon ${isExpanded ? '' : 'collapsed'}`}>▾</span>
             )}
           </div>
-          
+
           {isExpanded && (
             <>
-              {/* Render nodes for this process */}
-              {process.nodes && process.nodes.length > 0 && (
+              {/* Render nodes */}
+              {process.nodes.length > 0 && (
                 <ul className="nested-list">
-                  {process.nodes.map((node: any) => (
-                    <li 
-                      key={node.id} 
+                  {process.nodes.map(node => (
+                    <li
+                      key={node.id}
                       className={`node-item ${activeItemId === node.id ? 'active' : ''}`}
                       onClick={(e) => handleNodeClick(e, node.id)}
                     >
@@ -149,9 +140,9 @@ const ProcessTree: React.FC<ProcessTreeProps> = ({
                   ))}
                 </ul>
               )}
-              
+
               {/* Render sub-processes recursively */}
-              {process.subProcesses && process.subProcesses.length > 0 && (
+              {process.subProcesses.length > 0 && (
                 <ul className="nested-process-list">
                   {renderProcessTree(process.subProcesses, depth + 1)}
                 </ul>
@@ -171,19 +162,17 @@ const ProcessTree: React.FC<ProcessTreeProps> = ({
     return <div className="sidebar error">{error}</div>;
   }
 
-  const processTree = buildProcessTree();
+  const tree = buildProcessTree();
 
   return (
     <div className="sidebar">
       <h5>Process Map</h5>
-      {processTree.length > 0 ? (
+      {tree.length > 0 ? (
         <ul className="sidebar-list">
-          {renderProcessTree(processTree)}
+          {renderProcessTree(tree)}
         </ul>
       ) : (
-        <div className="empty-state">
-          No processes found for this playbook.
-        </div>
+        <div className="empty-state">No processes found for this playbook.</div>
       )}
     </div>
   );
