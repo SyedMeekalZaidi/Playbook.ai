@@ -33,8 +33,14 @@ const ProcessTree: React.FC<ProcessTreeProps> = ({
   const buildProcessTree = () => {
     if (!processes.length) return [];
     
-    const processMap = new Map();
-    const rootProcesses = [];
+    type TreeProcess = typeof processes[number] & {
+      subProcesses: TreeProcess[];
+      nodes: typeof nodes;
+    };
+    
+    const processMap = new Map<string, TreeProcess>();
+    const rootProcesses: TreeProcess[] = [];
+    
     
     // First pass: create process objects with empty children arrays
     processes.forEach(process => {

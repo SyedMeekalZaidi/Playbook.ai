@@ -35,7 +35,7 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
       setError(null);
       try {
         // If userId is provided, fetch playbooks for that user, otherwise fetch all
-        const endpoint = userId ? `/api/playbook?userId=${userId}` : '/api/playbook';
+        const endpoint = userId ? `/api/playbooks?userId=${userId}` : '/api/playbooks';
         const response = await fetch(endpoint);
         
         if (!response.ok) {

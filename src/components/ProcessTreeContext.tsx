@@ -46,7 +46,12 @@ export const ProcessTreeProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [expandedProcesses, setExpandedProcesses] = useState<Set<string>>(new Set());
 
   const fetchTreeData = async (playbookId: string) => {
-    if (!playbookId) return;
+    if (!playbookId) {
+      setProcesses([]);
+      setNodes([]);
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     setError(null);
