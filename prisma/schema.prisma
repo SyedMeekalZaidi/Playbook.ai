@@ -7,126 +7,27 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Playbook {
-  id                  String                 @id @default(uuid())
-  name                String
-  ownerId             String
-  isDeleted           Boolean                @default(false)
-  deletedAt           DateTime?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-  documentContent     Json?
-  shortDescription    String?                @db.VarChar(280)
-  changeLogs          ChangeLog[]
-  sessions            CollaborationSession[]
-  images              DocumentImage[]
-  collaborators       PlaybookCollaborator[]
-  processes           Process[]
-  processDependencies ProcessDependency[]
-  versionHistories    VersionHistory[]
-}
-
-model PlaybookCollaborator {
-  id         String   @id @default(uuid())
-  playbookId String
-  userId     String
-  role       Role     @default(ADMIN)
-  createdAt  DateTime @default(now())
-  playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-}
-
-model Process {
-  id               String              @id @default(uuid())
-  name             String
-  playbookId       String
-  parentId         String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  documentContent  Json?
-  shortDescription String?             @db.VarChar(280)
-  bpmnId           String?
-  bpmnXml          String?
-  images           DocumentImage[]
-  nodes            Node[]
-  parentProcess    Process?            @relation("ProcessToProcess", fields: [parentId], references: [id])
-  subProcesses     Process[]           @relation("ProcessToProcess")
-  playbook         Playbook            @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  fromProcess      ProcessDependency[] @relation("FromProcess")
-  toProcess        ProcessDependency[] @relation("ToProcess")
-  parameters       ProcessParameter[]  @relation("ProcessToParameter")
-}
-
-model ProcessParameter {
-  id        String   @id @default(uuid())
-  name      String
-  processId String?
-  nodeId    String?
-  type      String
-  mandatory Boolean
-  options   String[]
-  node      Node    @relation("NodeToParameter", fields: [nodeId], references: [id], onDelete: Cascade)
-  process   Process? @relation("ProcessToParameter", fields: [processId], references: [id], onDelete: Cascade)
-}
-
-model ProcessDependency {
-  id          String   @id @default(uuid())
-  fromId      String
-  toId        String
-  playbookId  String
-  trigger     String
-  fromProcess Process  @relation("FromProcess", fields: [fromId], references: [id])
-  playbook    Playbook @relation(fields: [playbookId], references: [id])
-  toProcess   Process  @relation("ToProcess", fields: [toId], references: [id])
-
-  @@unique([fromId, toId])
-}
-
-model Node {
-  id               String             @id @default(uuid())
-  name             String
-  type             String?
-  processId        String
-  lockedById       String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  documentContent  Json?
-  shortDescription String?            @db.VarChar(280)
-  bpmnId           String?
-  images           DocumentImage[]
-  process          Process            @relation(fields: [processId], references: [id], onDelete: Cascade)
-  parameters       ProcessParameter[] @relation("NodeToParameter")
-}
-
-model CollaborationSession {
-  id         String    @id @default(uuid())
-  playbookId String
-  userId     String
-  startedAt  DateTime  @default(now())
-  endedAt    DateTime?
-  playbook   Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-}
-
 model ChangeLog {
-  id         String   @id @default(uuid())
+  id         String   @id
   playbookId String
   userId     String
   action     String
   details    String?
   timestamp  DateTime @default(now())
-  playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  Playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 }
 
-model VersionHistory {
-  id         String   @id @default(uuid())
+model CollaborationSession {
+  id         String    @id
   playbookId String
-  version    Int
-  data       Json
-  createdAt  DateTime @default(now())
-  playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  userId     String
+  startedAt  DateTime  @default(now())
+  endedAt    DateTime?
+  Playbook   Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 }
 
 model DocumentImage {
-  id         String    @id @default(uuid())
+  id         String    @id
   url        String
   alt        String?
   caption    String?
@@ -134,14 +35,138 @@ model DocumentImage {
   processId  String?
   nodeId     String?
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  node       Node?     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
-  playbook   Playbook? @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  process    Process?  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  updatedAt  DateTime
+  Node       Node?     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  Playbook   Playbook? @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  Process    Process?  @relation(fields: [processId], references: [id], onDelete: Cascade)
+}
+
+model Node {
+  id               String             @id
+  name             String
+  type             String?
+  processId        String
+  lockedById       String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  documentContent  Json?
+  shortDescription String?            @db.VarChar(280)
+  bpmnId           String?
+  DocumentImage    DocumentImage[]
+  Process          Process            @relation(fields: [processId], references: [id], onDelete: Cascade)
+  ProcessParameter ProcessParameter[]
+}
+
+model Playbook {
+  id                   String                 @id
+  name                 String
+  ownerId              String
+  isDeleted            Boolean                @default(false)
+  deletedAt            DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  documentContent      Json?
+  shortDescription     String?                @db.VarChar(280)
+  status               Status                 @default(PLANNING)
+  ChangeLog            ChangeLog[]
+  CollaborationSession CollaborationSession[]
+  DocumentImage        DocumentImage[]
+  PlaybookCollaborator PlaybookCollaborator[]
+  Process              Process[]
+  ProcessDependency    ProcessDependency[]
+  VersionHistory       VersionHistory[]
+  Event                Event[]
+}
+
+model PlaybookCollaborator {
+  id         String   @id
+  playbookId String
+  userId     String
+  role       Role     @default(ADMIN)
+  createdAt  DateTime @default(now())
+  Playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+}
+
+model Process {
+  id               String              @id
+  name             String
+  playbookId       String
+  parentId         String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime
+  documentContent  Json?
+  shortDescription String?             @db.VarChar(280)
+  bpmnId           String?
+  bpmnXml          String?
+  DocumentImage    DocumentImage[]
+  Node             Node[]
+  Process          Process?            @relation("ProcessToProcess", fields: [parentId], references: [id])
+  other_Process    Process[]           @relation("ProcessToProcess")
+  Playbook         Playbook            @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  ProcessParameter ProcessParameter[]
+  fromProcesses    ProcessDependency[] @relation("ProcessDependency_fromIdToProcess")
+  toProcesses      ProcessDependency[] @relation("ProcessDependency_toIdToProcess")
+  Event            Event[]
+}
+
+model ProcessDependency {
+  id             String   @id
+  fromId         String
+  toId           String // to being the current process.
+  playbookId     String
+  trigger        String?
+  from_processId Process  @relation("ProcessDependency_fromIdToProcess", fields: [fromId], references: [id])
+  to_processId   Process? @relation("ProcessDependency_toIdToProcess", fields: [toId], references: [id])
+  Playbook       Playbook @relation(fields: [playbookId], references: [id])
+
+  @@unique([fromId, toId])
+}
+
+model ProcessParameter {
+  id        String   @id
+  name      String
+  processId String?
+  nodeId    String?
+  type      String
+  mandatory Boolean
+  options   String[]
+  Node      Node?    @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  Process   Process? @relation(fields: [processId], references: [id], onDelete: Cascade)
+}
+
+model VersionHistory {
+  id         String   @id
+  playbookId String
+  version    Int
+  data       Json
+  createdAt  DateTime @default(now())
+  Playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id               String   @id @default(uuid())
+  name             String
+  description      String?
+  playbookId       String
+  Playbook         Playbook @relation(fields: [playbookId], references: [id])
+  ownerId          String
+  parameters       String[]
+  status           Status?  @default(PLANNING)
+  currentProcessId String
+  currentProcess   Process  @relation(fields: [currentProcessId], references: [id])
 }
 
 enum Role {
   ADMIN
   PLAYBOOK_CREATOR
   COLLABORATOR
+}
+
+enum Status {
+  PENDING // pending approval to update a status.
+  PLANNING
+  ON_GOING
+  COMPLETE
+  CANCELLED
+  PUBLISHED //mainly for playbooks.
 }
