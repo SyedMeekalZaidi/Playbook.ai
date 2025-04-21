@@ -1,20 +1,22 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, withRetry } from '@/lib/prisma';
 
 // Get a specific process by ID
 export async function GET(
   req: Request,
-  { params }: { params: { processId: string } }
+  context: { params: { processId: string } }
 ) {
   try {
-    const { processId } = params;
+    const processId = context.params.processId;
     
     if (!processId) {
       return NextResponse.json({ error: 'Process ID is required' }, { status: 400 });
     }
     
-    const process = await prisma.process.findUnique({
-      where: { id: processId }
+    const process = await withRetry(async () => {
+      return await prisma.process.findUnique({
+        where: { id: processId }
+      });
     });
     
     if (!process) {
@@ -24,17 +26,20 @@ export async function GET(
     return NextResponse.json(process);
   } catch (error: any) {
     console.error('Error fetching process:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ 
+      error: error.message || 'Database connection error',
+      code: error.code
+    }, { status: 500 });
   }
 }
 
 // Update a process by ID
 export async function PUT(
   req: Request,
-  { params }: { params: { processId: string } }
+  context: { params: { processId: string } }
 ) {
   try {
-    const { processId } = params;
+    const processId = context.params.processId;
     const data = await req.json();
     
     if (!processId) {
@@ -42,8 +47,10 @@ export async function PUT(
     }
     
     // Check if process exists
-    const existingProcess = await prisma.process.findUnique({
-      where: { id: processId }
+    const existingProcess = await withRetry(async () => {
+      return await prisma.process.findUnique({
+        where: { id: processId }
+      });
     });
     
     if (!existingProcess) {
@@ -51,39 +58,46 @@ export async function PUT(
     }
     
     // Update the process
-    const updatedProcess = await prisma.process.update({
-      where: { id: processId },
-      data: {
-        name: data.name,
-        bpmnXml: data.bpmnXml,
-        bpmnId: data.bpmnId,
-        shortDescription: data.shortDescription,
-        // Add other fields as needed
-      }
+    const updatedProcess = await withRetry(async () => {
+      return await prisma.process.update({
+        where: { id: processId },
+        data: {
+          name: data.name,
+          bpmnXml: data.bpmnXml,
+          bpmnId: data.bpmnId,
+          shortDescription: data.shortDescription,
+          // Add other fields as needed
+        }
+      });
     });
     
     return NextResponse.json(updatedProcess);
   } catch (error: any) {
     console.error('Error updating process:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ 
+      error: error.message || 'Database connection error',
+      code: error.code
+    }, { status: 500 });
   }
 }
 
 // Delete a process by ID
 export async function DELETE(
   req: Request,
-  { params }: { params: { processId: string } }
+  context: { params: { processId: string } }
 ) {
   try {
-    const { processId } = params;
+    const processId = context.params.processId;
     
     if (!processId) {
       return NextResponse.json({ error: 'Process ID is required' }, { status: 400 });
     }
     
     // Check if process exists
-    const existingProcess = await prisma.process.findUnique({
-      where: { id: processId }
+    const existingProcess = await withRetry(async () => {
+      return await prisma.process.findUnique({
+        where: { id: processId }
+      });
     });
     
     if (!existingProcess) {
@@ -91,13 +105,18 @@ export async function DELETE(
     }
     
     // Delete the process - this will cascade delete related nodes due to schema configuration
-    await prisma.process.delete({
-      where: { id: processId }
+    await withRetry(async () => {
+      return await prisma.process.delete({
+        where: { id: processId }
+      });
     });
     
     return NextResponse.json({ success: true, message: 'Process deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting process:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ 
+      error: error.message || 'Database connection error',
+      code: error.code
+    }, { status: 500 });
   }
 }

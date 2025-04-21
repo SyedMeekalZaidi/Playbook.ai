@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, withRetry } from '@/lib/prisma';
 
 // Get all playbooks (non-deleted ones)
 export async function GET(req: Request) {
@@ -10,14 +10,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Server misconfiguration." }, { status: 500 });
     }
 
-    // Fetch active playbooks
-    const playbooks = await prisma.playbook.findMany({
-      where: {
-        isDeleted: false,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+    // Fetch active playbooks with retry logic
+    const playbooks = await withRetry(async () => {
+      return await prisma.playbook.findMany({
+        where: {
+          isDeleted: false,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
     });
 
     // If no playbooks found, return empty array
@@ -25,7 +27,10 @@ export async function GET(req: Request) {
   } catch (error: any) {
     console.error('Error fetching playbooks:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch playbooks. Please try again later.' },
+      { 
+        error: error.message || 'Failed to fetch playbooks. Please try again later.',
+        code: error.code
+      },
       { status: 500 }
     );
   }
