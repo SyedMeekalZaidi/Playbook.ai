@@ -3,7 +3,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import styles from './page.module.css';
 import NavBar from '../../components/NavBar';
-import { Modal, Button, Form } from 'react-bootstrap';
+import { Modal, Button, Form, Tab, Tabs } from 'react-bootstrap';
 import BpmnModelerComponent from '../../components/BpmnModeler';
 import { ProcessAPI, NodeAPI, PlaybookAPI } from '../../services/api';
 import 'bpmn-js/dist/assets/diagram-js.css';
@@ -24,6 +24,14 @@ interface DebugEntry {
 interface Playbook {
   id: string;
   name: string;
+}
+
+// Define Process interface
+interface Process {
+  id: string;
+  name: string;
+  bpmnXml?: string;
+  bpmnId?: string;
 }
 
 // Define mock user for demo purposes
@@ -55,17 +63,22 @@ export default function ModelerPage() {
   const [processId, setProcessId] = useState<string>('');
   const [playbookId, setPlaybookId] = useState<string>('');
   const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
-  const [processes, setProcesses] = useState<any[]>([]);
+  const [processes, setProcesses] = useState<Process[]>([]);
+  const [playbookProcesses, setPlaybookProcesses] = useState<Process[]>([]);
+  const [selectedExistingProcess, setSelectedExistingProcess] = useState<string>('');
   const [nodes, setNodes] = useState<any[]>([]);
   const [debugEntries, setDebugEntries] = useState<DebugEntry[]>([]);
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showNameDialog, setShowNameDialog] = useState<boolean>(true);
   const [showSaveSuccess, setShowSaveSuccess] = useState<boolean>(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [saveMessage, setSaveMessage] = useState<string>('');
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingPlaybooks, setIsLoadingPlaybooks] = useState(false);
+  const [isLoadingProcesses, setIsLoadingProcesses] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('new');
   
   // Set isClient to true after mounting on the client
   useEffect(() => {
@@ -74,6 +87,13 @@ export default function ModelerPage() {
     // Fetch playbooks when component mounts
     fetchPlaybooks();
   }, []);
+  
+  // Fetch processes when playbook changes
+  useEffect(() => {
+    if (playbookId) {
+      fetchProcessesForPlaybook(playbookId);
+    }
+  }, [playbookId]);
   
   // Fetch available playbooks
   const fetchPlaybooks = async () => {
@@ -122,6 +142,21 @@ export default function ModelerPage() {
       }
     } finally {
       setIsLoadingPlaybooks(false);
+    }
+  };
+
+  // Fetch processes for a specific playbook
+  const fetchProcessesForPlaybook = async (playbookId: string) => {
+    setIsLoadingProcesses(true);
+    try {
+      const fetchedProcesses = await ProcessAPI.getByPlaybook(playbookId);
+      console.log("Fetched processes for playbook:", fetchedProcesses);
+      setPlaybookProcesses(fetchedProcesses);
+    } catch (error) {
+      console.error("Error fetching processes for playbook:", error);
+      setPlaybookProcesses([]);
+    } finally {
+      setIsLoadingProcesses(false);
     }
   };
   
@@ -174,6 +209,43 @@ export default function ModelerPage() {
       setIsLoading(false);
     }
   };
+
+  // Handle loading an existing process
+  const handleLoadExistingProcess = async () => {
+    if (!selectedExistingProcess) return;
+    
+    setIsLoading(true);
+    
+    try {
+      // Fetch the full process details
+      const process = await ProcessAPI.getById(selectedExistingProcess);
+      
+      setProcessId(process.id);
+      setProcessName(process.name);
+      setProcesses([process]);
+      setShowNameDialog(false);
+      
+      // Fetch nodes for this process
+      const processNodes = await NodeAPI.getByProcess(process.id);
+      setNodes(processNodes);
+      
+      // Add debug entry
+      addDebugEntry({
+        action: 'LOAD',
+        timestamp: new Date(),
+        elementType: 'process',
+        elementName: process.name,
+        bpmnId: process.bpmnId || 'Process_1',
+        dbId: process.id,
+        details: `Loaded existing process from playbook: ${playbookId}`
+      });
+    } catch (error) {
+      console.error("Error loading process:", error);
+      setLoadError("Failed to load process. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   // Handle element selection
   const handleElementSelect = (element: any, databaseInfo: any) => {
@@ -196,6 +268,45 @@ export default function ModelerPage() {
       setLoadError("Failed to save diagram");
     }
   };
+
+  // Delete the current process
+  const handleDeleteProcess = async () => {
+    if (!processId) return;
+    
+    try {
+      await ProcessAPI.delete(processId);
+      
+      // Reset state and show success message
+      setSaveMessage(`Process "${processName}" deleted successfully!`);
+      setShowSaveSuccess(true);
+      setShowDeleteConfirm(false);
+      
+      // Reset the process state and show the new process dialog
+      setProcessId('');
+      setProcessName('');
+      setProcesses([]);
+      setNodes([]);
+      setShowNameDialog(true);
+      
+      // Refresh processes for the playbook
+      if (playbookId) {
+        fetchProcessesForPlaybook(playbookId);
+      }
+      
+      addDebugEntry({
+        action: 'DELETE',
+        timestamp: new Date(),
+        elementType: 'process',
+        elementName: processName,
+        bpmnId: 'N/A',
+        dbId: processId,
+        details: `Deleted process from playbook: ${playbookId}`
+      });
+    } catch (error) {
+      console.error("Error deleting process:", error);
+      setLoadError("Failed to delete process");
+    }
+  };
   
   // Handle element creation
   const handleElementCreate = async (data: any) => {
@@ -209,7 +320,6 @@ export default function ModelerPage() {
           playbookId: playbookId,
           bpmnId: data.data.bpmnId,
           bpmnXml: data.data.bpmnXml || null
-          // Remove description field
         });
         
         // Add to processes state
@@ -422,6 +532,7 @@ export default function ModelerPage() {
       case 'UPDATE': return styles.updateBadge;
       case 'DELETE': return styles.deleteBadge;
       case 'SAVE': return styles.saveBadge;
+      case 'LOAD': return styles.loadBadge;
       default: return '';
     }
   };
@@ -435,11 +546,11 @@ export default function ModelerPage() {
           Create and edit BPMN diagrams with database integration
         </p>
         
-        {/* Process Name Dialog */}
+        {/* Process Selection Dialog */}
         {isClient && (
           <ClientOnlyModal show={showNameDialog} backdrop="static" keyboard={false}>
             <Modal.Header>
-              <Modal.Title>New BPMN Diagram</Modal.Title>
+              <Modal.Title>BPMN Process Modeler</Modal.Title>
             </Modal.Header>
             <Modal.Body>
               {isLoadingPlaybooks ? (
@@ -472,27 +583,99 @@ export default function ModelerPage() {
                     </div>
                   )}
                   
-                  <Form.Group className="mb-3">
-                    <Form.Label>Enter a name for your process:</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={processName}
-                      onChange={(e) => setProcessName(e.target.value)}
-                      placeholder="My Business Process"
-                      autoFocus
-                      disabled={!playbookId}
-                    />
-                  </Form.Group>
+                  <Tabs
+                    activeKey={activeTab}
+                    onSelect={(k) => k && setActiveTab(k)}
+                    className="mb-3"
+                  >
+                    <Tab eventKey="new" title="Create New Process">
+                      <Form.Group className="mb-3">
+                        <Form.Label>Enter a name for your new process:</Form.Label>
+                        <Form.Control
+                          type="text"
+                          value={processName}
+                          onChange={(e) => setProcessName(e.target.value)}
+                          placeholder="My Business Process"
+                          autoFocus
+                          disabled={!playbookId}
+                        />
+                      </Form.Group>
+                      <Button 
+                        variant="primary" 
+                        className="w-100"
+                        onClick={handleStartNewDiagram} 
+                        disabled={!processName.trim() || !playbookId || isLoading || isLoadingPlaybooks}
+                      >
+                        {isLoading ? 'Creating...' : 'Create New Process'}
+                      </Button>
+                    </Tab>
+                    <Tab eventKey="load" title="Load Existing Process">
+                      {isLoadingProcesses ? (
+                        <div className="text-center my-4">
+                          <div className="spinner-border text-primary" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                          </div>
+                          <p className="mt-2">Loading processes...</p>
+                        </div>
+                      ) : playbookProcesses.length > 0 ? (
+                        <>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Select an existing process:</Form.Label>
+                            <Form.Select
+                              value={selectedExistingProcess}
+                              onChange={(e) => setSelectedExistingProcess(e.target.value)}
+                            >
+                              <option value="">-- Select a process --</option>
+                              {playbookProcesses.map(proc => (
+                                <option key={proc.id} value={proc.id}>{proc.name}</option>
+                              ))}
+                            </Form.Select>
+                          </Form.Group>
+                          <Button 
+                            variant="primary" 
+                            className="w-100"
+                            onClick={handleLoadExistingProcess} 
+                            disabled={!selectedExistingProcess || isLoading}
+                          >
+                            {isLoading ? 'Loading...' : 'Load Process'}
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="alert alert-info">
+                          No processes available in this playbook. Create a new one instead.
+                        </div>
+                      )}
+                    </Tab>
+                  </Tabs>
                 </>
               )}
             </Modal.Body>
+            <Modal.Footer className="justify-content-between">
+              <div className="text-muted small">
+                {activeTab === 'new' ? 'Creating a new process...' : 'Loading an existing process...'}
+              </div>
+            </Modal.Footer>
+          </ClientOnlyModal>
+        )}
+        
+        {/* Delete Confirmation Modal */}
+        {isClient && (
+          <ClientOnlyModal show={showDeleteConfirm} onHide={() => setShowDeleteConfirm(false)}>
+            <Modal.Header closeButton>
+              <Modal.Title>Confirm Deletion</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <div className="alert alert-danger">
+                <p>Are you sure you want to delete the process "{processName}"?</p>
+                <p>This action cannot be undone and all associated data will be permanently removed.</p>
+              </div>
+            </Modal.Body>
             <Modal.Footer>
-              <Button 
-                variant="primary" 
-                onClick={handleStartNewDiagram} 
-                disabled={!processName.trim() || !playbookId || isLoading || isLoadingPlaybooks}
-              >
-                {isLoading ? 'Creating...' : 'Create Diagram'}
+              <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleDeleteProcess}>
+                Delete Process
               </Button>
             </Modal.Footer>
           </ClientOnlyModal>
@@ -547,6 +730,12 @@ export default function ModelerPage() {
                   onClick={handleSaveDiagram}
                 >
                   Save Diagram
+                </button>
+                <button 
+                  className={styles.deleteButton} 
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  Delete Process
                 </button>
               </div>
             </div>

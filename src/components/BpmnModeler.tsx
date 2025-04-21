@@ -150,30 +150,42 @@ const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props
 
   // Create a new diagram when modeler is ready or load existing XML
   useEffect(() => {
-    if (!modeler || !databaseIntegration) return;
+    if (!modeler || !databaseIntegration || !processId) return;
+    
+    debugLog('Checking for existing BPMN diagram to load');
     
     // Check if there's an existing diagram to load
     const process = processes.find(p => p.id === processId);
-    if (process && process.bpmnXml) {
-      debugLog('Loading existing BPMN diagram');
+    
+    if (process && process.bpmnXml && process.bpmnXml.trim() !== '') {
+      debugLog('Loading existing BPMN diagram from XML', { processId, xmlLength: process.bpmnXml.length });
       
       try {
-        modeler.importXML(process.bpmnXml).then(() => {
-          debugLog('Existing diagram loaded successfully');
-          const canvas = modeler.get('canvas');
-          canvas.zoom('fit-viewport');
-        }).catch((err: any) => {
-          console.error('Error importing existing diagram:', err);
-          createNewDiagram();
-        });
+        modeler.importXML(process.bpmnXml)
+          .then(() => {
+            debugLog('Existing diagram loaded successfully');
+            const canvas = modeler.get('canvas');
+            canvas.zoom('fit-viewport');
+            
+            // Update UI elements with database information
+            if (databaseIntegration) {
+              debugLog('Syncing database elements with diagram');
+              databaseIntegration.syncDatabaseElements();
+            }
+          })
+          .catch((err: any) => {
+            console.error('Error importing existing diagram:', err);
+            createNewDiagram();
+          });
       } catch (error) {
         console.error('Error importing XML:', error);
         createNewDiagram();
       }
     } else {
+      debugLog('No existing XML found, creating new diagram');
       createNewDiagram();
     }
-  }, [modeler, databaseIntegration, processes, processId]);
+  }, [modeler, databaseIntegration, processes, processId, nodes]);
   
   // Create a new diagram
   const createNewDiagram = async () => {
