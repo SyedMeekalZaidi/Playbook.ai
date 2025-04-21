@@ -10,55 +10,36 @@ interface Playbook {
   shortDescription?: string;
 }
 
-interface User {
-  id: string;
-  email: string;
-  role: string;
-}
-
 interface EnhancedSidebarProps {
   defaultPlaybookId?: string;
   onSelectProcess?: (processId: string) => void;
   onSelectNode?: (nodeId: string) => void;
-  user: User; // must pass User as input
+  userId?: string;
 }
-
 
 const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
   defaultPlaybookId,
   onSelectProcess,
   onSelectNode,
-  user
+  userId
 }) => {
   const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
   const [selectedPlaybookId, setSelectedPlaybookId] = useState<string>(defaultPlaybookId || '');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch all playbooks for the user
   useEffect(() => {
     const fetchPlaybooks = async () => {
       setLoading(true);
       setError(null);
-
       try {
-        // check user role.
-        // if user is admin: fetch all of admin's playbooks
-        // if user is normal user: fetch only published playbooks.
-
-        let endpoint: string;
-
-        if (user.role === 'ADMIN') {
-          endpoint = `/api/playbook?userId=${user.id}`;
-        } else if (user.role === 'USER') {
-          endpoint = `/api/playbook?status=PUBLISHED`;
-        } else {
-          // endpoint = `/api/playbook?userId=${user.id}`;
-          endpoint = `/api/playbook?status=PUBLISHED`;
-        }
-
+        // If userId is provided, fetch playbooks for that user, otherwise fetch all
+        const endpoint = userId ? `/api/playbooks?userId=${userId}` : '/api/playbooks';
         const response = await fetch(endpoint);
+
         if (!response.ok) {
-          throw new Error(`[Sidebar] Failed to fetch playbooks: ${response.status}`);
+          throw new Error(`Failed to fetch playbooks: ${response.status}`);
         }
 
         const data = await response.json();
@@ -68,23 +49,20 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
         if (!selectedPlaybookId && data.length > 0) {
           setSelectedPlaybookId(data[0].id);
         }
-
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching playbooks:', err);
-        setError(err instanceof Error ? err.message : '[Sidebar] Failed to load playbooks');
+        setError(err instanceof Error ? err.message : 'Failed to load playbooks');
       } finally {
         setLoading(false);
       }
     };
 
     fetchPlaybooks();
-  }, [user.id, selectedPlaybookId])
-
+  }, [userId, selectedPlaybookId]);
 
   const handlePlaybookChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setSelectedPlaybookId(e.target.value);
-    };
-
+    setSelectedPlaybookId(e.target.value);
+  };
 
   return (
     <div className="sidebar-wrapper">
