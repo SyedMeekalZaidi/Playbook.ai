@@ -71,11 +71,10 @@ model Playbook {
   ChangeLog            ChangeLog[]
   CollaborationSession CollaborationSession[]
   DocumentImage        DocumentImage[]
+  Event                Event[]
   PlaybookCollaborator PlaybookCollaborator[]
   Process              Process[]
-  ProcessDependency    ProcessDependency[]
   VersionHistory       VersionHistory[]
-  Event                Event[]
 }
 
 model PlaybookCollaborator {
@@ -88,38 +87,30 @@ model PlaybookCollaborator {
 }
 
 model Process {
-  id               String              @id
-  name             String
-  playbookId       String
-  parentId         String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime
-  documentContent  Json?
-  shortDescription String?             @db.VarChar(280)
-  bpmnId           String?
-  bpmnXml          String?
-  DocumentImage    DocumentImage[]
-  Node             Node[]
-  Process          Process?            @relation("ProcessToProcess", fields: [parentId], references: [id])
-  other_Process    Process[]           @relation("ProcessToProcess")
-  Playbook         Playbook            @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  ProcessParameter ProcessParameter[]
-  fromProcesses    ProcessDependency[] @relation("ProcessDependency_fromIdToProcess")
-  toProcesses      ProcessDependency[] @relation("ProcessDependency_toIdToProcess")
-  Event            Event[]
+  id                                                           String              @id
+  name                                                         String
+  playbookId                                                   String
+  createdAt                                                    DateTime            @default(now())
+  updatedAt                                                    DateTime
+  documentContent                                              Json?
+  shortDescription                                             String?             @db.VarChar(280)
+  bpmnId                                                       String?
+  bpmnXml                                                      String?
+  DocumentImage                                                DocumentImage[]
+  Event                                                        Event[]
+  Node                                                         Node[]
+  Playbook                                                     Playbook            @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  ProcessDependency_ProcessDependency_nextProcessIdToProcess   ProcessDependency[] @relation("ProcessDependency_nextProcessIdToProcess")
+  ProcessDependency_ProcessDependency_parentProcessIdToProcess ProcessDependency[] @relation("ProcessDependency_parentProcessIdToProcess")
+  ProcessParameter                                             ProcessParameter[]
 }
 
 model ProcessDependency {
-  id             String   @id
-  fromId         String
-  toId           String // to being the current process.
-  playbookId     String
-  trigger        String?
-  from_processId Process  @relation("ProcessDependency_fromIdToProcess", fields: [fromId], references: [id])
-  to_processId   Process? @relation("ProcessDependency_toIdToProcess", fields: [toId], references: [id])
-  Playbook       Playbook @relation(fields: [playbookId], references: [id])
-
-  @@unique([fromId, toId])
+  id                                                 String  @id
+  nextProcessId                                      String
+  parentProcessId                                    String
+  Process_ProcessDependency_nextProcessIdToProcess   Process @relation("ProcessDependency_nextProcessIdToProcess", fields: [nextProcessId], references: [id])
+  Process_ProcessDependency_parentProcessIdToProcess Process @relation("ProcessDependency_parentProcessIdToProcess", fields: [parentProcessId], references: [id])
 }
 
 model ProcessParameter {
@@ -148,12 +139,12 @@ model Event {
   name             String
   description      String?
   playbookId       String
-  Playbook         Playbook @relation(fields: [playbookId], references: [id])
   ownerId          String
   parameters       String[]
   status           Status?  @default(PLANNING)
   currentProcessId String
   currentProcess   Process  @relation(fields: [currentProcessId], references: [id])
+  Playbook         Playbook @relation(fields: [playbookId], references: [id])
 }
 
 enum Role {
@@ -163,10 +154,10 @@ enum Role {
 }
 
 enum Status {
-  PENDING // pending approval to update a status.
+  PENDING
   PLANNING
   ON_GOING
   COMPLETE
   CANCELLED
-  PUBLISHED //mainly for playbooks.
+  PUBLISHED
 }
