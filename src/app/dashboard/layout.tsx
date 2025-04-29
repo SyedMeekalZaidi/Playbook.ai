@@ -34,8 +34,8 @@ export default function DashboardLayout(
           const newUser = {
             id: authUser.id,
             email: authUser.email || '',
-            role: authUser.user_metadata?.role || 'USER'
-            // role: 'ADMIN'
+            // role: authUser.user_metadata?.role || 'USER'
+            role: 'ADMIN'
           }
 
           setUser(newUser);

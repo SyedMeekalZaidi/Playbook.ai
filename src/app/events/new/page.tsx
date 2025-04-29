@@ -22,6 +22,15 @@ interface Process {
     name: string;
     description?: string;
     Node: Node[]
+    parentToProcesses: ProcessDependency[];
+    nextToProcesses: ProcessDependency[];
+}
+
+interface ProcessDependency {
+    id: string;
+    parentProcessId: string;
+    processId: string;
+    trigger?: string;
 }
 
 interface Node {
@@ -30,7 +39,6 @@ interface Node {
     type: string;
     description?: string;
     ProcessParameter: ProcessParameter[];
-    // processId: string;
 }
 
 interface ProcessParameter {
@@ -38,14 +46,14 @@ interface ProcessParameter {
     name: string;
     type: string;
     mandatory: boolean;
-    // info?: string;
+    info?: string;
     options: string[]
 }
 
 interface Option {
     id: number; // for rendering purposeses.
     text: string;
-    // value?: string; // user's response.
+    value?: string; // user's response.
 }
 
 
@@ -53,7 +61,7 @@ export default function NewEventPage() {
     const searchParams = useSearchParams();
     const playbookId = searchParams.get('playbookId');
     const router = useRouter();
-    const return_endpoint = `/playbook/${playbookId}`
+    const cancel_endpoint = `/playbook/${playbookId}`
 
     if (!playbookId){
         console.error("Error: No playbook id found [New Event Page]");
@@ -62,7 +70,10 @@ export default function NewEventPage() {
 
     const [playbook, setPlaybook] = useState<Playbook>();
     const [processes, setProcesses] = useState<Process[]>([]);
-    // const [nodeList, setNodeList] = useState<Node[]>([]);
+
+    const [currentProcess, setCurrentProcess] = useState<Process>();
+    const [nextProcess, setNextProcess] = useState<Process>();
+    const [firstProcess, setFirstProcess] = useState<Process>();
 
     // fetch the playbook's content
     useEffect(() => {
@@ -85,6 +96,24 @@ export default function NewEventPage() {
         }
         fetchPlaybook();
     }, [])
+
+    useEffect(() => {
+        const setProcessOrder = () => {
+            processes.find((process: Process) => {
+                if (process.nextToProcesses.length === 0) {
+                    console.log(process)
+                    const dependency: ProcessDependency = process.parentToProcesses[0];
+
+                    setFirstProcess(process);
+
+                    setCurrentProcess(process);
+                    setNextProcess(processes.find((p: Process) => p.id === dependency.processId));
+                }
+            })
+        }
+
+        setProcessOrder()
+    }, [processes])
 
     const renderNodes = (nodeList:Node[]) => {
         return (
@@ -116,12 +145,12 @@ export default function NewEventPage() {
             parameters.map((param) => (
                 <Form.Group key={param.id} className="mb-3">
                     <Form.Label>{param.name}</Form.Label>
-                    {param.type === "Checkbox" && (
+                    {(param.type === "Checkbox" || param.type === "Radio") && (
                         <Form.Group>
                             {param.options.map((text) => (
                                 <Form.Check
                                     key={`${param.id}-${text}`}
-                                    type="checkbox"
+                                    type={param.type === "Checkbox" ? "checkbox" : "radio"}
                                     label= {text}
                                     // value={option.id}
                                     onChange={(e) => {
@@ -153,14 +182,25 @@ export default function NewEventPage() {
     }
 
     const renderProcesses = () => {
+        // console.log("proceses:", processes)
+        // console.log("first: ", currentProcess)
+        // console.log('next:', nextProcess)
+        // return (
+        //     <div>
+        //         {processes.map((process) => (
+        //             <Card key={process.id} className='p-2 mb-4 mr-4'>
+        //                 <Card.Title className='p-2'>{process.name}</Card.Title>
+        //                 <Card.Body>{renderNodes(process.Node)}</Card.Body>
+        //             </Card>
+        //         ))}
+        //     </div>
+        // )
         return (
             <div>
-                {processes.map((process) => (
-                    <Card key={process.id} className='p-2 mb-4 mr-4'>
-                        <Card.Title className='p-2'>{process.name}</Card.Title>
-                        <Card.Body>{renderNodes(process.Node)}</Card.Body>
-                    </Card>
-                ))}
+                <Card key={currentProcess?.id} className='p-2 mb-4 mr-4'>
+                    <Card.Title className='p-2'>{currentProcess?.name}</Card.Title>
+                    <Card.Body>{renderNodes(currentProcess?.Node ?? [])}</Card.Body>
+                </Card>
             </div>
         )
     }
@@ -168,6 +208,23 @@ export default function NewEventPage() {
     const handleSave = () => {
         // check that all mandatory params have been answered
 
+    }
+
+    const handleNext = () => {
+        if (nextProcess) {
+            setCurrentProcess(nextProcess);
+            const dependency = nextProcess.parentToProcesses[0];
+            setNextProcess(processes.find((p: Process) => p.id === dependency?.processId));
+        }
+    }
+
+    const handleBack = () => {
+        const dependency = currentProcess?.nextToProcesses[0];
+        if (dependency) {
+            const previousProcess = processes.find((p: Process) => p.id === dependency.parentProcessId);
+            setNextProcess(currentProcess);
+            setCurrentProcess(previousProcess);
+        }
     }
 
     return (
@@ -228,30 +285,60 @@ export default function NewEventPage() {
                 {renderProcesses()}
 
                 <div className="mt-4 d-flex justify-content-between">
+                    {/* cancel button */}
                     <Button
-                        onClick={() => router.push('/dashboard')}
+                        onClick={() => router.push(cancel_endpoint)}
                         variant="outline-secondary"
                     >
                         Cancel
                     </Button>
-                    <Button
-                        onClick={handleSave}
-                        variant="primary"
-                        // disabled={isSubmitting}
-                        style={{ backgroundColor: '#14213D', borderColor: '#14213D', borderRadius: '8px' }}
-                        className="d-flex align-items-center"
-                    > Save
-                        {/* {isSubmitting ? (
-                            <>
-                                <Spinner as="span" animation="border" size="sm" role="status" className="me-2" />
-                                Saving...
-                            </>
-                        ) : (
-                            <>
-                                <FiSave size="1em" className="me-1" /> Save {isNewProcess ? 'Process' : 'Changes'}
-                            </>
-                        )} */}
-                    </Button>
+
+
+                    <div className='d-flex'>
+                        {/* back */}
+                        {currentProcess !== firstProcess && (
+                            <Button
+                                onClick={handleBack}
+                                variant='outline-secondary'
+                            > Back
+                            </Button>
+                        )}
+                        {/* save / next */}
+                        {nextProcess ? ( // go to next process
+                        // next button
+                        <Button
+                            onClick={handleNext}
+                            variant="primary"
+                            // disabled={isSubmitting}
+                            style={{ backgroundColor: '#14213D', borderColor: '#14213D', borderRadius: '8px' }}
+                            className="d-flex align-items-center"
+                        > Next
+                        </Button>
+                    ): (
+                        // save button
+                        <Button
+                            onClick={handleSave}
+                            variant="primary"
+                            // disabled={isSubmitting}
+                            style={{ backgroundColor: '#14213D', borderColor: '#14213D', borderRadius: '8px' }}
+                            className="d-flex align-items-center"
+                        > Save
+                            {/* {isSubmitting ? (
+                                <>
+                                    <Spinner as="span" animation="border" size="sm" role="status" className="me-2" />
+                                    Saving...
+                                </>
+                            ) : (
+                                <>
+                                    <FiSave size="1em" className="me-1" /> Save {isNewProcess ? 'Process' : 'Changes'}
+                                </>
+                            )} */}
+                        </Button>
+                        )}
+
+
+                    </div>
+
                 </div>
             </Container>
         </div>

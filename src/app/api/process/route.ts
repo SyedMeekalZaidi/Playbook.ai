@@ -19,9 +19,9 @@ interface ProcessParameter {
 
 interface ProcessDependency {
   processId: string;
-  fromId: string;
+  parentProcess: string;
   trigger?: string;
-  playbookId: string;
+
 }
 
 // Get a list of all processes or a specific process by ID
@@ -143,10 +143,9 @@ export async function POST(req: Request) {
           {
             data: {
               id: crypto.randomUUID(),
-              fromId: processDependency.fromId,
-              toId: newProcess.id,
+              parentProcessId: processDependency.parentProcessId,
+              processId: newProcess.id,
               trigger: processDependency.trigger,
-              playbookId: processDependency.playbookId,
             }
           }
         )
