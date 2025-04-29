@@ -158,10 +158,10 @@ enum Role {
 }
 
 enum Status {
-  PENDING
+  PENDING // pending approval to update a status.
   PLANNING
   ON_GOING
   COMPLETE
   CANCELLED
-  PUBLISHED
+  PUBLISHED //mainly for playbooks.
 }
