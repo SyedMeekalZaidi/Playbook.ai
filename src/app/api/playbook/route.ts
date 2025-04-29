@@ -34,6 +34,8 @@ export async function GET(req: Request) {
                   ProcessParameter: (includeNodeParams || includeAll)
                 }
               } : includeNodes,
+              parentToProcesses: includeAll,
+              nextToProcesses: includeAll,
             }
           } : includeProcess,
         }

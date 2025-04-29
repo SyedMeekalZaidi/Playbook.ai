@@ -892,9 +892,9 @@ export default function NewProcessPage() {
                 nodeList: transformedNodes,
                 processParameters: formattedProcessParams,
                 processDependency: fromProcess ? {
-                    fromId: fromProcess.id,
-                    playbookId: playbookId,
-                    trigger: 'COMPLETE',
+                    parentProcessId: fromProcess.id,
+                    // playbookId: playbookId,
+                    trigger: 'PENDING',
                 } : null
 
             };
@@ -910,7 +910,7 @@ export default function NewProcessPage() {
                 throw new Error("[New Process Page] Failed to save process");
             }
 
-            const savedData = await response.json();
+            // const savedData = await response.json();
 
 
             setIsSubmitting(false);
