@@ -87,7 +87,6 @@ model PlaybookCollaborator {
 }
 
 model Process {
-<<<<<<< HEAD
   id                                                           String              @id
   name                                                         String
   playbookId                                                   String
@@ -114,34 +113,6 @@ model ProcessDependency {
   trigger                                            String?
   Process_ProcessDependency_parentProcessIdToProcess Process @relation("ProcessDependency_parentProcessIdToProcess", fields: [parentProcessId], references: [id])
   Process_ProcessDependency_processIdToProcess       Process @relation("ProcessDependency_processIdToProcess", fields: [processId], references: [id])
-=======
-  id                String              @id
-  name              String
-  playbookId        String
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime
-  documentContent   Json?
-  shortDescription  String?             @db.VarChar(280)
-  bpmnId            String?
-  bpmnXml           String?
-  parentId          String?
-  DocumentImage     DocumentImage[]
-  Event             Event[]
-  Node              Node[]
-  Playbook          Playbook            @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  nextToProcesses   ProcessDependency[] @relation("ProcessDependency_parentProcess")
-  parentToProcesses ProcessDependency[] @relation("ProcessDependency_nextProcess")
-  ProcessParameter  ProcessParameter[]
-}
-
-model ProcessDependency {
-  id              String  @id
-  parentProcessId String
-  processId       String
-  trigger         String?
-  parentProcess   Process @relation("ProcessDependency_nextProcess", fields: [parentProcessId], references: [id])
-  Process         Process @relation("ProcessDependency_parentProcess", fields: [processId], references: [id])
->>>>>>> 668ba2c4d21424e61fe7486660bef6a2a159f54e
 
   @@unique([parentProcessId, processId])
 }
@@ -193,4 +164,23 @@ enum Status {
   COMPLETE
   CANCELLED
   PUBLISHED
+}
+
+// prisma/schema.prisma
+model PlaybookMember {
+  id         String   @id @default(uuid())
+  playbookId String
+  userId     String
+  role       MemberRole @default(VIEWER) // VIEWER | EDITOR, extend as needed
+  createdAt  DateTime  @default(now())
+
+  playbook   Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([playbookId, userId])
+}
+
+enum MemberRole {
+  VIEWER
+  EDITOR
 }
