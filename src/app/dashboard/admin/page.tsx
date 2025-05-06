@@ -10,39 +10,17 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Container from 'react-bootstrap/Container';
 import Spinner from 'react-bootstrap/Spinner';
-import { BsArrowRight } from 'react-icons/bs';
-import { FiFileText, FiSettings } from 'react-icons/fi';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import EnhancedSidebar from '@/components/EnhancedSidebar';
 import { useUser } from '@/components/UserContext';
-
-interface Playbook {
-    id: string;
-    name: string;
-    shortDescription?: string;
-    createdAt?: string;
-    Process: Process[];
-}
-
-interface Process {
-    id: string;
-    name: string;
-}
-
-interface Event {
-    id: string;
-    name: string;
-    playbookId: string;
-    description?: string;
-}
+import { PlaybookAPI } from '@/services/api'; // Import the API service
+import { Playbook, Process as PlaybookProcess } from '@/types/api'; // Import Playbook type
 
 export default function Dashboard() {
     const router = useRouter();
     const user = useUser();
-    if (!user) return;
 
     const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
-    const [selectedPlaybook, setSelectedPlaybook] = useState<Playbook>();
+    const [selectedPlaybook, setSelectedPlaybook] = useState<Playbook | undefined>(undefined);
     const [playbookName, setPlaybookName] = useState('');
     const [playbookDescription, setPlaybookDescription] = useState('');
     const [showCreatePlaybookModal, setShowCreatePlaybook] = useState(false);
@@ -56,23 +34,29 @@ export default function Dashboard() {
     const [shareError, setShareError] = useState<string | null>(null);
 
     useEffect(() => {
+        if (!user) return;
+
         const fetchPlaybooks = async () => {
             setPlaybooksLoading(true);
             setError(null);
             try {
-                const endpoint = `/api/playbook?userId=${user.id}`;
-                const response = await fetch(endpoint);
-                if (!response.ok) throw new Error(`[Admin Dashboard] Failed to fetch playbooks: ${response.status}`);
-                const data = await response.json();
+                const data = await PlaybookAPI.getAll({ ownerId: user.id });
                 setPlaybooks(data || []);
             } catch (error: any) {
-                setError("Failed to load playbooks. Please try again.");
+                setError(error.message || "Failed to load playbooks. Please try again.");
             } finally {
                 setPlaybooksLoading(false);
             }
         };
         fetchPlaybooks();
-    }, [user.id]);
+    }, [user]);
+
+    if (!user) return (
+        <Container className="py-4 px-4 flex-grow-1 text-center">
+            <Spinner animation="border" style={{ color: '#FEC872' }} />
+            <p className="mt-2 text-gray-600">Loading user data...</p>
+        </Container>
+    );
 
     const handleShowPlaybookModal = () => setShowCreatePlaybook(true);
     const handleClosePlaybookModal = () => {
@@ -84,28 +68,19 @@ export default function Dashboard() {
 
     const handleCreatePlaybook = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!playbookName.trim()) return;
-        if (!user?.id) {
-            setError("You must be logged in to create a playbook");
+        if (!playbookName.trim() || !user?.id) {
+            setError(!user?.id ? "You must be logged in to create a playbook" : "Playbook name is required");
             return;
         }
+
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch('/api/playbook', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: playbookName,
-                    shortDescription: playbookDescription || undefined,
-                    ownerId: user.id,
-                }),
+            const newPlaybook = await PlaybookAPI.create({
+                name: playbookName,
+                shortDescription: playbookDescription || undefined,
+                ownerId: user.id,
             });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || "Failed to create playbook");
-            }
-            const newPlaybook = await response.json();
             setPlaybooks([newPlaybook, ...playbooks]);
             handleClosePlaybookModal();
         } catch (error: any) {
@@ -122,7 +97,34 @@ export default function Dashboard() {
 
     const handleClosePlaybookCard = () => {
         setOpenPlaybookCard(false);
-        setError(null);
+        setSelectedPlaybook(undefined);
+        setShareError(null);
+        setShareEmail('');
+    };
+
+    const handleSharePlaybook = async () => {
+        if (!selectedPlaybook || !shareEmail.trim()) {
+            setShareError("Playbook and email are required to share.");
+            return;
+        }
+        setSharing(true);
+        setShareError(null);
+        try {
+            const userRes = await fetch(`/api/user?email=${shareEmail}`);
+            const userData = await userRes.json();
+
+            if (!userRes.ok || !userData?.id) {
+                throw new Error("User not found with the provided email.");
+            }
+
+            await PlaybookAPI.share(selectedPlaybook.id, { userId: userData.id });
+            setShowShareModal(false);
+            setShareEmail('');
+        } catch (error: any) {
+            setShareError(error.message || "Error sharing playbook.");
+        } finally {
+            setSharing(false);
+        }
     };
 
     return (
@@ -130,7 +132,7 @@ export default function Dashboard() {
             <Container className="py-4 px-4 flex-grow-1">
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold text-gray-800">
-                        Welcome, {user?.email?.split('@')[0] || 'User'}
+                        Welcome, {user?.email?.split('@')[0] || 'Admin'}
                     </h1>
                 </div>
                 <section className="mb-8">
@@ -145,7 +147,7 @@ export default function Dashboard() {
                             <Spinner animation="border" style={{ color: '#FEC872' }} />
                             <p className="mt-2 text-gray-600">Loading your playbooks...</p>
                         </div>
-                    ) : error ? (
+                    ) : error && !playbooksLoading ? (
                         <div className="text-center py-8 bg-gray-100 rounded-lg">
                             <p className="text-danger">{error}</p>
                             <Button onClick={() => window.location.reload()} style={{ backgroundColor: '#14213D', color: 'white', marginTop: '10px' }}>
@@ -159,7 +161,7 @@ export default function Dashboard() {
                                     <Card className="h-100 shadow-sm">
                                         <Card.Body>
                                             <Card.Title>{playbook.name}</Card.Title>
-                                            <Card.Text>{playbook.shortDescription}</Card.Text>
+                                            <Card.Text>{playbook.shortDescription || "No description available."}</Card.Text>
                                             <Button variant="outline-dark" onClick={() => handleOpenPlaybookCard(playbook)}>View</Button>
                                         </Card.Body>
                                     </Card>
@@ -184,11 +186,11 @@ export default function Dashboard() {
                 <Form onSubmit={handleCreatePlaybook}>
                     <Modal.Body>
                         {error && <div className="alert alert-danger">{error}</div>}
-                        <Form.Group className="mb-3" controlId="playbookName">
+                        <Form.Group className="mb-3" controlId="playbookNameModal">
                             <Form.Label>Name</Form.Label>
                             <Form.Control type="text" value={playbookName} onChange={(e) => setPlaybookName(e.target.value)} required />
                         </Form.Group>
-                        <Form.Group className="mb-3" controlId="playbookDescription">
+                        <Form.Group className="mb-3" controlId="playbookDescriptionModal">
                             <Form.Label>Description (optional)</Form.Label>
                             <Form.Control as="textarea" rows={3} value={playbookDescription} onChange={(e) => setPlaybookDescription(e.target.value)} />
                         </Form.Group>
@@ -210,17 +212,20 @@ export default function Dashboard() {
                     {selectedPlaybook?.shortDescription && (
                         <p className="text-muted">{selectedPlaybook.shortDescription}</p>
                     )}
+                    {!selectedPlaybook?.shortDescription && (
+                        <p className="text-muted">No description available.</p>
+                    )}
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant="secondary" onClick={handleClosePlaybookCard}>Close</Button>
-                    <Button variant="warning" onClick={() => setShowShareModal(true)}>Share</Button>
-                    <Button variant="secondary" onClick={() => router.push(`/playbook/${selectedPlaybook?.id}`)}>Open Playbook</Button>
+                    <Button variant="warning" onClick={() => { setOpenPlaybookCard(false); setShowShareModal(true); }}>Share</Button>
+                    <Button variant="primary" style={{ backgroundColor: '#14213D', color: 'white' }} onClick={() => router.push(`/playbook/${selectedPlaybook?.id}`)}>Open Playbook</Button>
                 </Modal.Footer>
             </Modal>
 
-            <Modal show={showShareModal} onHide={() => setShowShareModal(false)} centered>
+            <Modal show={showShareModal} onHide={() => { setShowShareModal(false); setShareError(null); setShareEmail(''); }} centered>
                 <Modal.Header closeButton style={{ backgroundColor: '#14213D', color: 'white' }}>
-                    <Modal.Title>Share Playbook</Modal.Title>
+                    <Modal.Title>Share {selectedPlaybook?.name}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     {shareError && <div className="alert alert-danger">{shareError}</div>}
@@ -235,35 +240,11 @@ export default function Dashboard() {
                     </Form.Group>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowShareModal(false)}>Cancel</Button>
+                    <Button variant="secondary" onClick={() => { setShowShareModal(false); setShareError(null); setShareEmail(''); }}>Cancel</Button>
                     <Button
                         variant="primary"
-                        onClick={async () => {
-                            setSharing(true);
-                            setShareError(null);
-                            try {
-                                const userRes = await fetch(`/api/user?email=${shareEmail}`);
-                                const userData = await userRes.json();
-                                if (!userRes.ok || !userData?.id) throw new Error("User not found");
-
-                                const insertRes = await fetch(`/api/playbook/share`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        playbookId: selectedPlaybook?.id,
-                                        userId: userData.id,
-                                    }),
-                                });
-
-                                if (!insertRes.ok) throw new Error("Failed to share playbook");
-                                setShowShareModal(false);
-                            } catch (error: any) {
-                                setShareError(error.message || "Error sharing playbook.");
-                            } finally {
-                                setSharing(false);
-                            }
-                        }}
-                        disabled={sharing}
+                        onClick={handleSharePlaybook}
+                        disabled={sharing || !shareEmail.trim()}
                         style={{ backgroundColor: '#14213D', color: 'white' }}
                     >
                         {sharing ? <Spinner size="sm" animation="border" className="me-2" /> : null}

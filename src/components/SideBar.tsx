@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './SideBar.css';
+import { PlaybookAPI } from '@/services/api'; // Import API services
 
 // Define interfaces according to your schema
 interface Process {
@@ -38,20 +39,27 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!playbookId) return;
-      
-      setLoading(true);
+      if (!playbookId) {
+        setLoading(false);
+        setError("No Playbook ID provided.");
+        return;
+      }
       try {
+        setLoading(true);
         // Fetch processes for this playbook
-        const processResponse = await fetch(`/api/playbooks/${playbookId}/processes`);
-        const processData = await processResponse.json();
+        const playbookData = await PlaybookAPI.getById(playbookId, { includeProcess: true, includeNodes: true, includeNodeParams: true });
+        const fetchedProcesses = playbookData.Process || [];
         
-        // Fetch nodes for this playbook
-        const nodeResponse = await fetch(`/api/playbooks/${playbookId}/nodes`);
-        const nodeData = await nodeResponse.json();
-        
-        setProcesses(processData);
-        setNodes(nodeData);
+        // Extract nodes from processes
+        let fetchedNodes: Node[] = [];
+        fetchedProcesses.forEach(process => {
+          if (process.nodes) {
+            fetchedNodes = fetchedNodes.concat(process.nodes);
+          }
+        });
+
+        setProcesses(fetchedProcesses);
+        setNodes(fetchedNodes);
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load process hierarchy');

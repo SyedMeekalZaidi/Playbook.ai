@@ -1,65 +1,41 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import NavBar from '@/components/NavBar';
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
 import Container from 'react-bootstrap/Container';
 import Modal from 'react-bootstrap/Modal';
 
-
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useUser } from "@/components/UserContext";
 import { Form, Spinner } from 'react-bootstrap';
-import { FiFileText, FiSettings } from 'react-icons/fi';
 import { BsArrowRight } from 'react-icons/bs';
+import { PlaybookAPI, EventAPI } from '@/services/api';
+import { Playbook as PlaybookType, Event as EventType } from '@/types/api';
 
-
-interface Playbook {
-    id: string;
-    name: string;
-    shortDescription?: string;
-}
-
-interface Event {
-    id: string;
-    name: string;
-    playbookId: string;
-    description?: string;
-}
-
-export default function UserDashboard(){
-    const user = useUser()
-    if (!user) return <div>Loading...</div>
-
+export default function UserDashboard() {
+    const user = useUser();
     const router = useRouter();
     const [showCreateEventModal, setShowCreateEventModal] = useState(false);
-    const [eventName, setEventName] = useState('');
-    const [eventDescription, setEventDescription] = useState('');
-    const [events, setEvents] =useState<Event[]>([])
-    const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-
-    const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
-    const [playbookName, setPlaybookName] = useState('');
-
+    const [events, setEvents] = useState<EventType[]>([]);
+    const [playbooks, setPlaybooks] = useState<PlaybookType[]>([]);
+    const [playbookNameForEvent, setPlaybookNameForEvent] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [playbooksLoading, setPlaybooksLoading] = useState(true);
+    const [eventsLoading, setEventsLoading] = useState(true);
 
-    // fetch playbooks with status 'PUBLISHED'
     useEffect(() => {
         const fetchPlaybooks = async () => {
+            setPlaybooksLoading(true);
             try {
-                // dcurrently doesnt filter for publisjed playbooks
-                const response = await fetch('/api/playbook?status=PUBLISHED');
-                if (!response.ok) {
-                    throw new Error("Failed to fetch playbooks");
-                }
-                const data = await response.json();
-                // console.log("Fetched playbooks:", data);
+                const data = await PlaybookAPI.getAll({ status: 'PUBLISHED' });
                 setPlaybooks(data || []);
-
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Error fetching playbooks:", error);
+                setError("Failed to fetch published playbooks. Please try again later.");
+            } finally {
+                setPlaybooksLoading(false);
             }
         };
 
@@ -67,58 +43,71 @@ export default function UserDashboard(){
     }, []);
 
     useEffect(() => {
+        if (!user) return;
+
         const fetchEvents = async () => {
+            setEventsLoading(true);
             try {
-                const response = await fetch(`/api/event?userId=${user.id}`);
-                if (!response.ok) {
-                    throw new Error("Failed to fetch events");
-                }
-                const data = await response.json();
+                const data = await EventAPI.getAll({ userId: user.id });
                 setEvents(data || []);
-                // console.log(data)
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Error fetching events:", error);
+            } finally {
+                setEventsLoading(false);
             }
         };
         fetchEvents();
+    }, [user]);
 
-    }, [])
+    if (!user) return (
+        <Container className="py-4 px-4 flex-grow-1 text-center">
+            <Spinner animation="border" style={{ color: '#FEC872' }} />
+            <p className="mt-2 text-gray-600">Loading user data...</p>
+        </Container>
+    );
 
-
-    const handleCreateEvent = async (e:React.FormEvent) => {
-        // router.push('/events/new')
+    const handleCreateEvent = async (e: React.FormEvent) => {
         e.preventDefault();
-
-        // need to choose a playbook.
-        if(!playbookName.trim()) return;
+        if (!playbookNameForEvent.trim()) {
+            setError("Please select a playbook.");
+            return;
+        }
 
         setIsLoading(true);
         setError(null);
 
         try {
-            const selectedPlaybook = playbooks.find((p) => p.name === playbookName);
+            const selectedPlaybook = playbooks.find((p) => p.name === playbookNameForEvent);
             if (selectedPlaybook) {
                 router.push(`/events/new?playbookId=${selectedPlaybook.id}`);
-            }
-            else throw Error(`Could not find playbook ${playbookName}`)
-        } catch (error:any) {
-            setError(error.message || "Failed to create event. Please try again later.")
-        } finally {setIsLoading(false)}
-
-    }
+            } else throw Error(`Could not find playbook named "${playbookNameForEvent}"`);
+        } catch (error: any) {
+            setError(error.message || "Failed to initiate event creation. Please try again later.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleCloseEventModal = () => {
         setShowCreateEventModal(false);
-        setPlaybookName("");
-        setEventName('');
-        setEventDescription('');
+        setPlaybookNameForEvent("");
         setError(null);
     };
-    const handleShowEventModal = () => setShowCreateEventModal(true);
+
+    const handleShowEventModal = () => {
+        if (playbooksLoading) {
+            setError("Playbooks are still loading. Please wait.");
+            return;
+        }
+        if (playbooks.length === 0) {
+            setError("No published playbooks available to create an event from.");
+            return;
+        }
+        setShowCreateEventModal(true);
+    };
 
     return (
         <>
-            {/* Main content column */}
             <Container className="py-4 px-4 flex-grow-1">
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold text-gray-800">
@@ -127,113 +116,93 @@ export default function UserDashboard(){
                 </div>
 
                 <section className='mb-8'>
-                    <h2 className="text-2xl font-semibold mb-4" style={{ color: '#14213D' }}>Events</h2>
-                    <div className='d-flex flex-wrap gap-4'>
-                    {events.map((process: Event) => (
-                            <Card
-                                key={process.id}
-                                style={{
-                                    width: '18rem',
-                                    borderLeft: '4px solid #FEC872',
-                                    transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out'
-                                }}
-                                className={`shadow-sm ${selectedEventId === process.id ? 'border-primary' : ''}`}
-                                onMouseOver={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(-5px)';
-                                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
-                                }}
-                                onMouseOut={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.12)';
-                                }}
-                            >
-                                <Card.Body>
-                                    <div className="d-flex justify-content-between align-items-center mb-3">
-                                        <Card.Title style={{ color: '#14213D' }}>{process.name}</Card.Title>
-                                        <BsArrowRight style={{ color: '#FEC872' }} />
-                                    </div>
-
-                                    {/* Action buttons */}
-                                    {/* <div className="d-flex justify-content-between mt-3">
-                                        <Button
-                                            variant="outline-secondary"
-                                            size="sm"
-                                            onClick={() => router.push(`/processes/${process.id}/docs`)}
-                                            className="d-flex align-items-center"
-                                            style={{ borderColor: '#14213D', color: '#14213D' }}
-                                        >
-                                            <FiFileText className="me-1" /> Docs
-                                        </Button>
-
-                                        <Button
-                                            variant="outline-primary"
-                                            size="sm"
-                                            onClick={() => handleParametersClick(process.id)}
-                                            className="d-flex align-items-center"
-                                            style={{ borderColor: '#FEC872', color: '#14213D' }}
-                                        >
-                                            <FiSettings className="me-1" /> Parameters
-                                        </Button>
-                                    </div> */}
-
-                                </Card.Body>
-                            </Card>
-                        ))}
-                        <Card
-                            style={{ width: '18rem' }}
-                            className="border-dashed border-2 d-flex justify-content-center align-items-center"
-                            onMouseOver={(e) => {
-                                e.currentTarget.style.backgroundColor = '#f8f8f8';
-                            }}
-                            onMouseOut={(e) => {
-                                e.currentTarget.style.backgroundColor = '';
-                            }}
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                        <h2 className="text-2xl font-semibold" style={{ color: '#14213D' }}>My Events</h2>
+                        <Button
+                            variant="primary"
+                            onClick={handleShowEventModal}
+                            style={{ backgroundColor: '#14213D', color: 'white' }}
+                            disabled={playbooksLoading || playbooks.length === 0}
                         >
-                            <Card.Body className="text-center">
-                                <Button
-                                    variant="link"
-                                    onClick={handleShowEventModal}
-                                    className="text-decoration-none"
-                                    style={{ color: '#14213D' }}
+                            Create New Event
+                        </Button>
+                    </div>
+                    {error && !showCreateEventModal && <div className="alert alert-warning">{error}</div>}
+
+                    <div className='d-flex flex-wrap gap-4'>
+                        {eventsLoading ? (
+                            <div className="text-center py-8 w-100">
+                                <Spinner animation="border" style={{ color: '#FEC872' }} />
+                                <p className="mt-2 text-gray-600">Loading your events...</p>
+                            </div>
+                        ) : events.length > 0 ? (
+                            events.map((eventItem: EventType) => (
+                                <Card
+                                    key={eventItem.id}
+                                    style={{
+                                        width: '18rem',
+                                        borderLeft: '4px solid #FEC872',
+                                        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out'
+                                    }}
+                                    className={`shadow-sm`}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-5px)';
+                                        e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.12)';
+                                    }}
                                 >
-                                    <div className="mb-2">
-                                        <i className="bi bi-plus-circle" style={{ fontSize: '2rem' }}></i>
-                                    </div>
-                                    Create New Event
-                                </Button>
-                            </Card.Body>
-                        </Card>
+                                    <Card.Body>
+                                        <div className="d-flex justify-content-between align-items-center mb-3">
+                                            <Card.Title style={{ color: '#14213D' }}>{eventItem.name}</Card.Title>
+                                            <BsArrowRight style={{ color: '#FEC872' }} />
+                                        </div>
+                                        <Card.Text className="text-muted small">
+                                            {eventItem.description || "No description."}
+                                        </Card.Text>
+                                    </Card.Body>
+                                </Card>
+                            ))
+                        ) : (
+                            <div className="text-center py-8 bg-gray-100 rounded-lg w-100">
+                                <p className="text-gray-600 mb-4">You haven't created any events yet.</p>
+                            </div>
+                        )}
                     </div>
                 </section>
             </Container>
 
             <Modal show={showCreateEventModal} onHide={handleCloseEventModal} centered>
                 <Modal.Header closeButton style={{ backgroundColor: '#14213D', color: 'white' }}>
-                    <Modal.Title>Create New Event</Modal.Title>
+                    <Modal.Title>Create New Event From Playbook</Modal.Title>
                 </Modal.Header>
                 <Form onSubmit={handleCreateEvent}>
                     <Modal.Body>
-                        {error && (
+                        {error && showCreateEventModal && (
                             <div className="alert alert-danger" role="alert">
                                 {error}
                             </div>
                         )}
 
-                        <Form.Group className="mb-3" controlId="eventCategory">
-                            <Form.Label>Playbook</Form.Label>
+                        <Form.Group className="mb-3" controlId="eventPlaybookSelect">
+                            <Form.Label>Select Playbook</Form.Label>
                             <Form.Control
                                 as="select"
-                                value={playbookName}
-                                onChange={(e) => setPlaybookName(e.target.value)}
+                                value={playbookNameForEvent}
+                                onChange={(e) => setPlaybookNameForEvent(e.target.value)}
                                 required
+                                disabled={playbooksLoading}
                             >
-                                <option value="" disabled>--Select a playbook--</option>
+                                <option value="" disabled>--Select a published playbook--</option>
                                 {playbooks.map((playbook) => (
                                     <option key={playbook.id} value={playbook.name}>
                                         {playbook.name}
                                     </option>
                                 ))}
                             </Form.Control>
+                            {playbooksLoading && <Form.Text className="text-muted">Loading playbooks...</Form.Text>}
                         </Form.Group>
                     </Modal.Body>
                     <Modal.Footer>
@@ -243,8 +212,7 @@ export default function UserDashboard(){
                         <Button
                             variant="primary"
                             type="submit"
-                            // disabled={!eventName.trim() || isLoading}
-                            disabled={!playbookName || isLoading}
+                            disabled={!playbookNameForEvent || isLoading || playbooksLoading}
                             style={{ backgroundColor: '#14213D', color: 'white' }}
                         >
                             {isLoading ? (
@@ -257,13 +225,13 @@ export default function UserDashboard(){
                                         aria-hidden="true"
                                         className="me-2"
                                     />
-                                    Creating...
+                                    Proceeding...
                                 </>
-                            ) : 'Create Event'}
+                            ) : 'Next'}
                         </Button>
                     </Modal.Footer>
                 </Form>
             </Modal>
         </>
-    )
+    );
 }

@@ -1,37 +1,81 @@
 import { NextResponse } from 'next/server';
-import { prisma, withRetry } from '@/lib/prisma';
+import { prisma, withRetry } from '@/lib/prisma'; // Assuming withRetry is in lib/prisma
+import { handleApiError } from '@/lib/api-utils';
+import { Status } from '@prisma/client';
 
-// Get all playbooks (non-deleted ones)
+// GET all playbooks, optionally filtered by ownerId or status
 export async function GET(req: Request) {
   try {
-    // Defensive check: ensure Prisma is initialized
-    if (!prisma || !prisma.playbook) {
-      console.error("Prisma client or playbook model not available.");
-      return NextResponse.json({ error: "Server misconfiguration." }, { status: 500 });
+    const { searchParams } = new URL(req.url);
+    const ownerId = searchParams.get('ownerId');
+    const statusParam = searchParams.get('status');
+
+    let whereClause: any = { isDeleted: false };
+
+    if (ownerId) {
+      whereClause.ownerId = ownerId;
     }
 
-    // Fetch active playbooks with retry logic
+    if (statusParam) {
+      if (Object.values(Status).includes(statusParam as Status)) {
+        whereClause.status = statusParam as Status;
+      } else {
+        return NextResponse.json({ error: 'Invalid status value' }, { status: 400 });
+      }
+    }
+    
+    // Defensive check: ensure Prisma is initialized
+    if (!prisma || !prisma.playbook) {
+      return handleApiError(new Error("Prisma client or playbook model not available."), "Server misconfiguration.");
+    }
+
     const playbooks = await withRetry(async () => {
       return await prisma.playbook.findMany({
-        where: {
-          isDeleted: false,
-        },
+        where: whereClause,
         orderBy: {
           createdAt: 'desc',
         },
       });
     });
 
-    // If no playbooks found, return empty array
     return NextResponse.json(playbooks || []);
   } catch (error: any) {
-    console.error('Error fetching playbooks:', error);
-    return NextResponse.json(
-      { 
-        error: error.message || 'Failed to fetch playbooks. Please try again later.',
-        code: error.code
+    return handleApiError(error, 'Error fetching playbooks');
+  }
+}
+
+// POST - Create a new playbook
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { name, ownerId, shortDescription } = body;
+
+    if (!name) {
+      return NextResponse.json({ error: 'Playbook name is required' }, { status: 400 });
+    }
+    if (!ownerId) {
+      return NextResponse.json({ error: 'Owner ID is required' }, { status: 400 });
+    }
+
+    const playbook = await prisma.playbook.create({
+      data: {
+        id: crypto.randomUUID(),
+        name,
+        ownerId,
+        shortDescription: shortDescription || null,
+        updatedAt: new Date(), // createdAt is default, updatedAt should be set
+        // status will use default from schema (PLANNING)
       },
-      { status: 500 }
-    );
+    });
+
+    return NextResponse.json(playbook, { status: 201 });
+  } catch (error: any) {
+    if ((error as any).code === 'P2002') { // Unique constraint violation
+      return NextResponse.json({ error: 'A playbook with this ID already exists or unique constraint failed.' }, { status: 409 });
+    }
+    if ((error as any).code === 'P2003') { // Foreign key constraint failed
+      return NextResponse.json({ error: 'The owner ID provided does not exist.' }, { status: 400 });
+    }
+    return handleApiError(error, 'Error creating playbook');
   }
 }

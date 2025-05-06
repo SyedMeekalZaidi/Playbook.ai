@@ -5,157 +5,98 @@ import { Container, Row, Col, Card, Tabs, Tab, Alert, Spinner, Button, Form, Lis
 import EnhancedSidebar from '@/components/EnhancedSidebar';
 import { FiPlus, FiTrash2, FiSave, FiArrowLeft } from 'react-icons/fi';
 import 'bootstrap/dist/css/bootstrap.min.css';
-
-interface Playbook {
-    id: string;
-    name: string;
-    shortDescription: string;
-    Process: Process[];
-}
-
-interface Event {
-    name: string;
-}
-
-interface Process {
-    id: string;
-    name: string;
-    description?: string;
-    Node: Node[]
-    parentToProcesses: ProcessDependency[];
-    nextToProcesses: ProcessDependency[];
-}
-
-interface ProcessDependency {
-    id: string;
-    parentProcessId: string;
-    processId: string;
-    trigger?: string;
-}
-
-interface Node {
-    id:string;
-    name: string;
-    type: string;
-    description?: string;
-    ProcessParameter: ProcessParameter[];
-}
-
-interface ProcessParameter {
-    id: string;
-    name: string;
-    type: string;
-    mandatory: boolean;
-    info?: string;
-    options: string[]
-}
-
-interface Option {
-    id: number; // for rendering purposeses.
-    text: string;
-    value?: string; // user's response.
-}
-
+import { PlaybookAPI, EventAPI } from '@/services/api';
+import { 
+    Playbook as PlaybookType, 
+    Process as ProcessType, 
+    Node as NodeType, 
+    ProcessParameter as ProcessParameterType,
+    ProcessDependency as ProcessDependencyType,
+} from '@/types/api';
 
 export default function NewEventPage() {
     const searchParams = useSearchParams();
     const playbookId = searchParams.get('playbookId');
     const router = useRouter();
-    const cancel_endpoint = `/playbook/${playbookId}`
+    const cancel_endpoint = `/playbook/${playbookId}`;
 
     if (!playbookId){
         console.error("Error: No playbook id found [New Event Page]");
         return;
     }
 
-    const [playbook, setPlaybook] = useState<Playbook>();
-    const [processes, setProcesses] = useState<Process[]>([]);
-
-    const [currentProcess, setCurrentProcess] = useState<Process>();
-    const [nextProcess, setNextProcess] = useState<Process>();
-    const [firstProcess, setFirstProcess] = useState<Process>();
+    const [playbook, setPlaybook] = useState<PlaybookType>();
+    const [processes, setProcesses] = useState<ProcessType[]>([]);
+    const [currentProcess, setCurrentProcess] = useState<ProcessType>();
+    const [nextProcess, setNextProcess] = useState<ProcessType>();
+    const [firstProcess, setFirstProcess] = useState<ProcessType>();
 
     // fetch the playbook's content
     useEffect(() => {
-        const fetchPlaybook = async () => {
+        const fetchPlaybookData = async () => {
+            if (!playbookId) return;
             try {
-                const response = await fetch(`/api/playbook?id=${playbookId}&includeAll=true`)
-
-                if (!response.ok) throw new Error("[New Event Page] Failed to fetch playbook");
-
-                const data:Playbook = await response.json();
-
-                setPlaybook(data)
-                setProcesses(data.Process || [])
-                // console.log(data.Process);
-
-
+                const data = await PlaybookAPI.getById(playbookId, { includeAll: true });
+                setPlaybook(data);
+                setProcesses(data.Process || []);
             } catch (error: any) {
-                console.error(error.message || "[New Event Page] Error fetching playbook.")
+                console.error(error.message || "[New Event Page] Error fetching playbook.");
             }
-        }
-        fetchPlaybook();
-    }, [])
+        };
+        fetchPlaybookData();
+    }, [playbookId]);
 
     useEffect(() => {
         const setProcessOrder = () => {
-            processes.find((process: Process) => {
-                if (process.nextToProcesses.length === 0) {
-                    console.log(process)
-                    const dependency: ProcessDependency = process.parentToProcesses[0];
+            if (!processes || processes.length === 0) return;
 
-                    setFirstProcess(process);
+            const first = processes.find(p => !(p.parentToProcesses && p.parentToProcesses.length > 0)); 
 
-                    setCurrentProcess(process);
-                    setNextProcess(processes.find((p: Process) => p.id === dependency.processId));
+            if (first) {
+                setFirstProcess(first);
+                setCurrentProcess(first);
+
+                if (first.nextToProcesses && first.nextToProcesses.length > 0) {
+                    const nextDep = first.nextToProcesses[0];
+                    setNextProcess(processes.find((p) => p.id === nextDep.processId));
+                } else {
+                    setNextProcess(undefined);
                 }
-            })
-        }
+            }
+        };
 
-        setProcessOrder()
-    }, [processes])
+        setProcessOrder();
+    }, [processes]);
 
-    const renderNodes = (nodeList:Node[]) => {
+    const renderNodes = (nodeList:NodeType[]) => {
         return (
             nodeList.map((node) => (
                 <Card key={node.id} className='mb-2'>
                     <Card.Body>
                         <Card.Title>{node.name}</Card.Title>
-                        {/* show description if available */}
-                        {node.description? <Card.Text>{node.description}</Card.Text> : null}
-
+                        {node.description ? <Card.Text>{node.description}</Card.Text> : null}
                         <hr />
                         {renderParameters(node.ProcessParameter)}
                     </Card.Body>
                 </Card>
             ))
-        )
-    }
+        );
+    };
 
-    const renderParameters = (parameters: ProcessParameter[]) => {
-
-        // parameters.forEach((param) => {
-        //     param.options = param.options.map((option, index) => ({
-        //         id: index,
-        //         text: option
-        //     }));
-        // });
-
+    const renderParameters = (parameters: ProcessParameterType[]) => {
         return (
             parameters.map((param) => (
                 <Form.Group key={param.id} className="mb-3">
-                    <Form.Label>{param.name}</Form.Label>
-                    {(param.type === "Checkbox" || param.type === "Radio") && (
+                    <Form.Label>{param.name}{param.mandatory ? ' *' : ''}</Form.Label>
+                    {(param.type === "Checkbox" || param.type === "Radio") && param.options && (
                         <Form.Group>
                             {param.options.map((text) => (
                                 <Form.Check
                                     key={`${param.id}-${text}`}
                                     type={param.type === "Checkbox" ? "checkbox" : "radio"}
-                                    label= {text}
-                                    // value={option.id}
+                                    label={text}
                                     onChange={(e) => {
                                         const isChecked = e.target.checked;
-                                        // console.log(`Option ${option.text} is ${isChecked ? 'checked' : 'unchecked'}`);
                                     }}
                                 />
                             ))}
@@ -168,33 +109,16 @@ export default function NewEventPage() {
                         <Form.Select>
                             <option value="">Select an option</option>
                             {param.options.map((option) => (
-                                <option
-                                    key={`${param.id}-${option}`}
-                                    value=""
-                                    // onChange={} // store value
-                                >{option}</option>
+                                <option key={`${param.id}-${option}`} value="">{option}</option>
                             ))}
                         </Form.Select>
                     )}
                 </Form.Group>
             ))
-        )
-    }
+        );
+    };
 
     const renderProcesses = () => {
-        // console.log("proceses:", processes)
-        // console.log("first: ", currentProcess)
-        // console.log('next:', nextProcess)
-        // return (
-        //     <div>
-        //         {processes.map((process) => (
-        //             <Card key={process.id} className='p-2 mb-4 mr-4'>
-        //                 <Card.Title className='p-2'>{process.name}</Card.Title>
-        //                 <Card.Body>{renderNodes(process.Node)}</Card.Body>
-        //             </Card>
-        //         ))}
-        //     </div>
-        // )
         return (
             <div>
                 <Card key={currentProcess?.id} className='p-2 mb-4 mr-4'>
@@ -202,39 +126,49 @@ export default function NewEventPage() {
                     <Card.Body>{renderNodes(currentProcess?.Node ?? [])}</Card.Body>
                 </Card>
             </div>
-        )
-    }
+        );
+    };
 
-    const handleSave = () => {
-        // check that all mandatory params have been answered
-
-    }
+    const handleSave = async () => {
+        // Example: Collect event data and call EventAPI.create
+        // const eventData = { name: eventName, description: eventDescription, playbookId, ...otherFields };
+        // try {
+        //   await EventAPI.create(eventData);
+        //   router.push(cancel_endpoint);
+        // } catch (error) {
+        //   console.error("Failed to save event:", error);
+        // }
+    };
 
     const handleNext = () => {
         if (nextProcess) {
             setCurrentProcess(nextProcess);
-            const dependency = nextProcess.parentToProcesses[0];
-            setNextProcess(processes.find((p: Process) => p.id === dependency?.processId));
+            if (nextProcess.nextToProcesses && nextProcess.nextToProcesses.length > 0) {
+                const nextDep = nextProcess.nextToProcesses[0];
+                setNextProcess(processes.find((p) => p.id === nextDep.processId));
+            } else {
+                setNextProcess(undefined);
+            }
         }
-    }
+    };
 
     const handleBack = () => {
-        const dependency = currentProcess?.nextToProcesses[0];
-        if (dependency) {
-            const previousProcess = processes.find((p: Process) => p.id === dependency.parentProcessId);
-            setNextProcess(currentProcess);
-            setCurrentProcess(previousProcess);
+        if (currentProcess?.parentToProcesses && currentProcess.parentToProcesses.length > 0) {
+            const prevDep = currentProcess.parentToProcesses[0];
+            const previousProcess = processes.find((p) => p.id === prevDep.parentProcessId);
+            if (previousProcess) {
+                setNextProcess(currentProcess);
+                setCurrentProcess(previousProcess);
+            }
         }
-    }
+    };
 
     return (
         <div className="d-flex flex-column flex-lg-row pt-2">
-            {/* Sidebar */}
             <div className="sidebar-column px-3 py-3">
                 playbooks processses here.
             </div>
 
-            {/* Main content */}
             <Container className='py-4'>
                 <div className="mb-4">
                     <Button
@@ -258,8 +192,6 @@ export default function NewEventPage() {
                                         placeholder="Enter event name"
                                         onChange={(e) => {
                                             const name = e.target.value;
-                                            // Handle event name change
-                                            // console.log("Event Name:", name);
                                         }}
                                     />
                                 </Form.Group>
@@ -270,22 +202,17 @@ export default function NewEventPage() {
                                         rows={3}
                                         placeholder="Enter event description"
                                         onChange={(e) => {
-                                            const description = e.target.value;
-                                            // Handle event description change
-                                            // console.log("Event Description:", description);
                                         }}
                                     />
                                 </Form.Group>
                             </Form>
                         </Card.Body>
                     </Card>
-
                 </div>
 
                 {renderProcesses()}
 
                 <div className="mt-4 d-flex justify-content-between">
-                    {/* cancel button */}
                     <Button
                         onClick={() => router.push(cancel_endpoint)}
                         variant="outline-secondary"
@@ -293,9 +220,7 @@ export default function NewEventPage() {
                         Cancel
                     </Button>
 
-
                     <div className='d-flex'>
-                        {/* back */}
                         {currentProcess !== firstProcess && (
                             <Button
                                 onClick={handleBack}
@@ -303,42 +228,24 @@ export default function NewEventPage() {
                             > Back
                             </Button>
                         )}
-                        {/* save / next */}
-                        {nextProcess ? ( // go to next process
-                        // next button
+                        {nextProcess ? (
                         <Button
                             onClick={handleNext}
                             variant="primary"
-                            // disabled={isSubmitting}
                             style={{ backgroundColor: '#14213D', borderColor: '#14213D', borderRadius: '8px' }}
                             className="d-flex align-items-center"
                         > Next
                         </Button>
                     ): (
-                        // save button
                         <Button
                             onClick={handleSave}
                             variant="primary"
-                            // disabled={isSubmitting}
                             style={{ backgroundColor: '#14213D', borderColor: '#14213D', borderRadius: '8px' }}
                             className="d-flex align-items-center"
                         > Save
-                            {/* {isSubmitting ? (
-                                <>
-                                    <Spinner as="span" animation="border" size="sm" role="status" className="me-2" />
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <FiSave size="1em" className="me-1" /> Save {isNewProcess ? 'Process' : 'Changes'}
-                                </>
-                            )} */}
                         </Button>
                         )}
-
-
                     </div>
-
                 </div>
             </Container>
         </div>

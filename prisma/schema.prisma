@@ -60,7 +60,7 @@ model Node {
 model Playbook {
   id                   String                 @id
   name                 String
-  ownerId              String
+  ownerId              String // This is a String, not directly related to a User model here
   isDeleted            Boolean                @default(false)
   deletedAt            DateTime?
   createdAt            DateTime               @default(now())
@@ -80,10 +80,12 @@ model Playbook {
 model PlaybookCollaborator {
   id         String   @id
   playbookId String
-  userId     String
+  userId     String // Stores Supabase User ID as a String
   role       Role     @default(ADMIN)
   createdAt  DateTime @default(now())
   Playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+
+  @@unique([playbookId, userId]) // Added unique constraint
 }
 
 model Process {
@@ -164,20 +166,6 @@ enum Status {
   COMPLETE
   CANCELLED
   PUBLISHED
-}
-
-// prisma/schema.prisma
-model PlaybookMember {
-  id         String   @id @default(uuid())
-  playbookId String
-  userId     String
-  role       MemberRole @default(VIEWER) // VIEWER | EDITOR, extend as needed
-  createdAt  DateTime  @default(now())
-
-  playbook   Playbook  @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([playbookId, userId])
 }
 
 enum MemberRole {

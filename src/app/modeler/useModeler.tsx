@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
-import { ProcessAPI, NodeAPI, PlaybookAPI } from '../../services/api';
-import { DebugEntry, Playbook, Process, User } from './interfaces';
+import { PlaybookAPI, ProcessAPI, NodeAPI } from '@/services/api'; // Import API services
+import { Playbook, Process } from '@/types/api'; // Import types
+import { DebugEntry, User } from './interfaces';
 
 const DEFAULT_USER: User = {
   id: 'default-user-id',
@@ -52,7 +53,7 @@ export const useModeler = () => {
   const fetchPlaybooks = async () => {
     setIsLoadingPlaybooks(true);
     try {
-      const fetchedPlaybooks = await PlaybookAPI.getAll();
+      const fetchedPlaybooks = await PlaybookAPI.getAll({ ownerId: DEFAULT_USER.id }); // Or without ownerId if fetching all accessible
       console.log("Fetched playbooks:", fetchedPlaybooks);
 
       if (!fetchedPlaybooks || fetchedPlaybooks.length === 0) {
@@ -93,7 +94,7 @@ export const useModeler = () => {
   const fetchProcessesForPlaybook = async (playbookId: string) => {
     setIsLoadingProcesses(true);
     try {
-      const fetchedProcesses = await ProcessAPI.getByPlaybook(playbookId);
+      const fetchedProcesses = await ProcessAPI.getAll({ playbookId: playbookId });
       console.log("Fetched processes for playbook:", fetchedProcesses);
       setPlaybookProcesses(fetchedProcesses);
     } catch (error) {
@@ -115,7 +116,7 @@ export const useModeler = () => {
     try {
       console.log("Creating process with playbookId:", playbookId);
       const newProcess = await ProcessAPI.create({
-        name: processName,
+        processName: processName, // Corrected: ensure this matches CreateProcessPayload
         playbookId: playbookId,
       });
 
@@ -230,10 +231,8 @@ export const useModeler = () => {
     try {
       if (data.type === 'process') {
         const newProcess = await ProcessAPI.create({
-          name: data.data.name || 'New Process',
+          processName: data.data.name || 'New Process', // Corrected: ensure this matches CreateProcessPayload
           playbookId: playbookId,
-          bpmnId: data.data.bpmnId,
-          bpmnXml: data.data.bpmnXml || null,
         });
 
         setProcesses(prev => [...prev, newProcess]);
@@ -279,13 +278,15 @@ export const useModeler = () => {
     console.log('Updating element:', data);
     try {
       if (data.type === 'process') {
-        const updatedProcess = await ProcessAPI.update({
-          id: data.id,
-          ...data.data,
-        });
+        const updatePayload: Partial<import('@/types/api').UpdateProcessPatchPayload> = {};
+        if (data.data.name !== undefined) updatePayload.name = data.data.name;
+        if (data.data.bpmnId !== undefined) updatePayload.bpmnId = data.data.bpmnId;
+        if (data.data.bpmnXml !== undefined) updatePayload.bpmnXml = data.data.bpmnXml;
+
+        const updatedProcess = await ProcessAPI.patch(data.id, updatePayload);
 
         setProcesses(prev =>
-          prev.map(p => p.id === data.id ? { ...p, ...data.data } : p)
+          prev.map(p => p.id === data.id ? { ...p, ...updatePayload } : p)
         );
 
         addDebugEntry({
@@ -293,20 +294,22 @@ export const useModeler = () => {
           timestamp: new Date(),
           elementType: data.type,
           elementName: data.data.name || 'Unnamed Process',
-          bpmnId: 'N/A',
+          bpmnId: data.data.bpmnId || 'N/A',
           dbId: data.id,
           details: `Updated: ${Object.keys(data.data).join(', ')}`,
         });
 
         return updatedProcess;
       } else {
-        const updatedNode = await NodeAPI.update({
-          id: data.id,
-          ...data.data,
-        });
+        const updatePayload: Partial<import('@/types/api').UpdateNodePayload> = {};
+        if (data.data.name !== undefined) updatePayload.name = data.data.name;
+        if (data.data.type !== undefined) updatePayload.type = data.data.type;
+        if (data.data.bpmnId !== undefined) updatePayload.bpmnId = data.data.bpmnId;
+
+        const updatedNode = await NodeAPI.update(data.id, updatePayload);
 
         setNodes(prev =>
-          prev.map(n => n.id === data.id ? { ...n, ...data.data } : n)
+          prev.map(n => n.id === data.id ? { ...n, ...updatePayload } : n)
         );
 
         addDebugEntry({
@@ -314,7 +317,7 @@ export const useModeler = () => {
           timestamp: new Date(),
           elementType: data.type,
           elementName: data.data.name || 'Unnamed Element',
-          bpmnId: 'N/A',
+          bpmnId: data.data.bpmnId || 'N/A',
           dbId: data.id,
           details: `Updated: ${Object.keys(data.data).join(', ')}`,
         });
@@ -358,8 +361,7 @@ export const useModeler = () => {
     console.log('Saving diagram XML:', xml.substring(0, 100) + '...');
     try {
       if (processId) {
-        const updatedProcess = await ProcessAPI.update({
-          id: processId,
+        const updatedProcess = await ProcessAPI.patch(processId, {
           bpmnXml: xml,
         });
 
@@ -370,13 +372,11 @@ export const useModeler = () => {
 
       for (const mapping of databaseMappings) {
         if (mapping.dbType === 'process') {
-          await ProcessAPI.update({
-            id: mapping.dbId,
+          await ProcessAPI.patch(mapping.dbId, {
             bpmnId: mapping.bpmnId,
           });
         } else {
-          await NodeAPI.update({
-            id: mapping.dbId,
+          await NodeAPI.update(mapping.dbId, {
             bpmnId: mapping.bpmnId,
           });
         }

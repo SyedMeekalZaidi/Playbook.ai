@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma, withRetry } from '@/lib/prisma'; // Assuming withRetry is in @/lib/prisma
-import { handleApiError } from '@/lib/api-utils';
+import { prisma, withRetry } from '@/lib/prisma';
 
 // Get all nodes for a specific process
 export async function GET(
@@ -25,19 +24,20 @@ export async function GET(
       return NextResponse.json({ error: 'Process not found' }, { status: 404 });
     }
     
-    // Get all nodes for this process, including their parameters
+    // Get all nodes for this process
     const nodes = await withRetry(async () => {
       return await prisma.node.findMany({
         where: { processId },
-        include: {
-            ProcessParameter: true // Include parameters for each node
-        },
-        orderBy: { createdAt: 'asc' } // Consistent ordering
+        orderBy: { createdAt: 'asc' }
       });
     });
     
     return NextResponse.json(nodes);
   } catch (error: any) {
-    return handleApiError(error, 'Error fetching nodes for process');
+    console.error('Error fetching nodes for process:', error);
+    return NextResponse.json({ 
+      error: error.message || 'Database connection error',
+      code: error.code
+    }, { status: 500 });
   }
 }

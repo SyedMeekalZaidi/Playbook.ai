@@ -1,55 +1,53 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { handleApiError } from '@/lib/api-utils';
 
-interface PlaybookNodesParams {
-  params: {
-    playbookId: string;
-  };
-}
-
-// GET all nodes for a specific playbook (across all processes)
+// Get all nodes for a specific playbook (across all processes)
 export async function GET(
-  _req: Request,
-  { params }: PlaybookNodesParams
+  req: Request,
+  { params }: { params: { playbookId: string } }
 ) {
   try {
+    // In Next.js App Router, we need to use await when accessing params
     const { playbookId } = params;
-
+    
     if (!playbookId) {
       return NextResponse.json({ error: 'Playbook ID is required' }, { status: 400 });
     }
-
+    
+    // Check if playbook exists
     const playbook = await prisma.playbook.findUnique({
-      where: { id: playbookId, isDeleted: false },
+      where: { id: playbookId }
     });
-
+    
     if (!playbook) {
       return NextResponse.json({ error: 'Playbook not found' }, { status: 404 });
     }
-
+    
+    // Get all process IDs for this playbook
     const processes = await prisma.process.findMany({
       where: { playbookId },
-      select: { id: true },
+      select: { id: true }
     });
-
-    if (processes.length === 0) {
-      return NextResponse.json([]); // No processes, so no nodes
-    }
-
+    
     const processIds = processes.map(process => process.id);
-
+    
+    if (processIds.length === 0) {
+      return NextResponse.json([]);
+    }
+    
+    // Get all nodes for these processes
     const nodes = await prisma.node.findMany({
       where: {
         processId: {
-          in: processIds,
-        },
+          in: processIds
+        }
       },
-      orderBy: { name: 'asc' },
+      orderBy: { name: 'asc' }
     });
-
+    
     return NextResponse.json(nodes);
   } catch (error: any) {
-    return handleApiError(error, `Error fetching nodes for playbook ${params.playbookId}`);
+    console.error('Error fetching nodes for playbook:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

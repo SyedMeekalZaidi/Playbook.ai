@@ -11,57 +11,13 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 
-interface Playbook {
-    name: string;
-    Process: Process[];
-}
-
-interface Process {
-    id: string,
-    name: string,
-    description: string | null,
-    nodes: Node[],
-    playbookId: string,
-    parentId: string | null,
-    subProcesses: Process[]
-    nextProcesses: ProcessDependency[]
-    prevProcesses: ProcessDependency[]
-}
-
-interface Node {
-    id: number,
-    name: string,
-    type: string,
-    description: string | null,
-    parameters: NodeParameter[]
-}
-
-interface NodeParameter {
-    id: number
-    name: string
-    type: string
-    mandatory: boolean
-    info: string | null
-    options: Option[]
-}
-
-interface Option {
-    id: number,
-    text: string
-}
-
-interface ProcessParameter {
-    name: string
-    type: string
-    mandatory: boolean
-    options: string[]
-}
-
-interface ProcessDependency {
-    fromId: string | null,
-    toId: string | null,
-    playbookId: string
-}
+import { 
+    Playbook as PlaybookType, 
+    Process as ProcessType, 
+    Node as NodeType, 
+    ProcessParameter as ProcessParameterType,
+    ProcessDependency as ProcessDependencyType 
+} from '@/types/api';
 
 export default function NewProcessPage() {
     const searchParams = useSearchParams();
@@ -76,18 +32,18 @@ export default function NewProcessPage() {
     const returnEndpoint = `/playbook/${playbookId}`
 
 
-    const [playbook, setPlaybook] = useState<Playbook>();
-    const [existingProcesses, setExistingProcesses] = useState<Process[]>([]);
+    const [playbook, setPlaybook] = useState<PlaybookType>();
+    const [existingProcesses, setExistingProcesses] = useState<ProcessType[]>([]);
 
-    const [fromProcess, setFromProcess] = useState<Process | null>(null);
+    const [fromProcess, setFromProcess] = useState<ProcessType | null>(null);
 
     const [activeTab, setActiveTab] = useState('nodes');
     const [processName, setProcessName] = useState('');
     const [processDescription, setProcessDescription] = useState('');
 
-    const [nodeList, setNodeList] = useState<Node[]>([]);
+    const [nodeList, setNodeList] = useState<NodeType[]>([]);
     const [nextNodeId, setNextNodeId] = useState<number>(1);
-    const [processParameters, setProcessParameters] = useState<ProcessParameter[]>([]);
+    const [processParameters, setProcessParameters] = useState<ProcessParameterType[]>([]);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -104,7 +60,7 @@ export default function NewProcessPage() {
 
                 if (!response.ok) throw new Error(`[New Process Page] Failed to fetch playbooks: ${response.status}`)
 
-                const data:Playbook = await response.json();
+                const data:PlaybookType = await response.json();
 
                 setPlaybook(data);
                 setExistingProcesses(data.Process || [])
@@ -122,7 +78,7 @@ export default function NewProcessPage() {
 
     // Node operations:
     const handleAddNode = () => {
-        const newNode: Node = {
+        const newNode: NodeType = {
             id: nextNodeId,
             name: '',
             type: 'Task',
@@ -146,7 +102,7 @@ export default function NewProcessPage() {
 
         const paramId = Math.round((maxParamId + 0.1) * 100) / 100;
 
-        const newParam: NodeParameter = {
+        const newParam: NodeType['parameters'][0] = {
             id: paramId,
             name: '',
             type: 'Checkbox',
@@ -327,7 +283,7 @@ export default function NewProcessPage() {
     }
 
     // Render functions for the UI components
-    const renderQuestionField = (nodeId: number, param: NodeParameter) => {
+    const renderQuestionField = (nodeId: number, param: NodeType['parameters'][0]) => {
         switch (param.type) {
             case "Checkbox":
                 return (
@@ -484,7 +440,7 @@ export default function NewProcessPage() {
         }
     };
 
-    const renderNodeBox = (node: Node) => {
+    const renderNodeBox = (node: NodeType) => {
         return (
             <Card key={node.id} className="mb-4 shadow-sm" style={{ borderLeft: '3px solid #FEC872' }}>
                 <Card.Header className="bg-white">

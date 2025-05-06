@@ -3,6 +3,7 @@ import { ProcessTreeProvider } from './ProcessTreeContext';
 import ProcessTree from './ProcessTree';
 import Form from 'react-bootstrap/Form';
 import Spinner from 'react-bootstrap/Spinner';
+import { PlaybookAPI } from '@/services/api'; // Import PlaybookAPI
 
 interface Playbook {
   id: string;
@@ -23,7 +24,6 @@ interface EnhancedSidebarProps {
   user: User; // must pass User as input
 }
 
-
 const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
   defaultPlaybookId,
   onSelectProcess,
@@ -41,32 +41,18 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
       setError(null);
 
       try {
-        // check user role.
-        // if user is admin: fetch all of admin's playbooks
-        // if user is normal user: fetch only published playbooks.
-
-        let endpoint: string;
-
+        let fetchedPlaybooks;
         if (user.role === 'ADMIN') {
-          endpoint = `/api/playbook?userId=${user.id}`;
-        } else if (user.role === 'USER') {
-          endpoint = `/api/playbook?status=PUBLISHED`;
-        } else {
-          // endpoint = `/api/playbook?userId=${user.id}`;
-          endpoint = `/api/playbook?status=PUBLISHED`;
+          fetchedPlaybooks = await PlaybookAPI.getAll({ ownerId: user.id });
+        } else { // Assuming 'USER' or other roles see published playbooks
+          fetchedPlaybooks = await PlaybookAPI.getAll({ status: 'PUBLISHED' });
         }
 
-        const response = await fetch(endpoint);
-        if (!response.ok) {
-          throw new Error(`[Sidebar] Failed to fetch playbooks: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setPlaybooks(data);
+        setPlaybooks(fetchedPlaybooks || []);
 
         // If no playbook is selected and we have playbooks, select the first one
-        if (!selectedPlaybookId && data.length > 0) {
-          setSelectedPlaybookId(data[0].id);
+        if (!selectedPlaybookId && fetchedPlaybooks && fetchedPlaybooks.length > 0) {
+          setSelectedPlaybookId(fetchedPlaybooks[0].id);
         }
 
       } catch (err: any) {
@@ -78,13 +64,11 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
     };
 
     fetchPlaybooks();
-  }, [user.id, selectedPlaybookId])
-
+  }, [user.id, user.role, selectedPlaybookId]); // Added user.role dependency
 
   const handlePlaybookChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setSelectedPlaybookId(e.target.value);
-    };
-
+    setSelectedPlaybookId(e.target.value);
+  };
 
   return (
     <div className="sidebar-wrapper">

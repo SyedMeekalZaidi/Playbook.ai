@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { handleApiError } from '@/lib/api-utils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,7 +19,8 @@ export async function GET(req: Request) {
     const { data, error } = await supabase.auth.admin.listUsers();
 
     if (error || !data) {
-      return NextResponse.json({ error: 'Failed to list users' }, { status: 500 });
+      console.error('Supabase listUsers error:', error);
+      return NextResponse.json({ error: 'Failed to list users from authentication provider', supabaseError: error?.message }, { status: 500 });
     }
 
     const match = data.users.find((user) => user.email === email);
@@ -29,7 +31,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ id: match.id }, { status: 200 });
   } catch (err) {
-    console.error("Unexpected error:", err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return handleApiError(err, "Unexpected error in user route");
   }
 }

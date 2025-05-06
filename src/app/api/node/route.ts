@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { handleApiError } from '@/lib/api-utils';
 
 // Get nodes (filter by process ID if provided)
 export async function GET(req: Request) {
@@ -35,8 +36,7 @@ export async function GET(req: Request) {
       return NextResponse.json(nodes);
     }
   } catch (error: any) {
-    console.error('Error fetching nodes:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleApiError(error, 'Error fetching nodes');
   }
 }
 
@@ -44,25 +44,28 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, type, processId, bpmnId } = body;
+    const { name, type, processId, bpmnId, shortDescription, documentContent } = body;
     
-    if (!name || !type || !processId) {
-      return NextResponse.json({ error: 'Name, type, and processId are required' }, { status: 400 });
+    if (!name || !processId) {
+      return NextResponse.json({ error: 'Name and processId are required' }, { status: 400 });
     }
     
     const node = await prisma.node.create({
       data: {
+        id: crypto.randomUUID(),
         name,
-        type,
+        type: type || 'Task', // Default type if not provided
         processId,
-        bpmnId: bpmnId || null
+        bpmnId: bpmnId || null,
+        shortDescription: shortDescription || null,
+        documentContent: documentContent || undefined, // Prisma handles undefined as no-op for Json?
+        updatedAt: new Date(), // Manually set updatedAt
       }
     });
     
     return NextResponse.json(node, { status: 201 });
   } catch (error: any) {
-    console.error('Error creating node:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return handleApiError(error, 'Error creating node');
   }
 }
 
@@ -70,25 +73,30 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, type, bpmnId } = body;
+    const { id, ...updateData } = body;
     
     if (!id) {
       return NextResponse.json({ error: 'Node ID is required' }, { status: 400 });
+    }
+
+    if (Object.keys(updateData).length === 0) {
+        return NextResponse.json({ error: 'No fields to update provided' }, { status: 400 });
     }
     
     const node = await prisma.node.update({
       where: { id },
       data: {
-        ...(name !== undefined && { name }),
-        ...(type !== undefined && { type }),
-        ...(bpmnId !== undefined && { bpmnId })
+        ...updateData,
+        updatedAt: new Date(), // Manually set updatedAt
       }
     });
     
     return NextResponse.json(node);
   } catch (error: any) {
-    console.error('Error updating node:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error.code === 'P2025') {
+        return NextResponse.json({ error: 'Node not found' }, { status: 404 });
+    }
+    return handleApiError(error, 'Error updating node');
   }
 }
 
@@ -106,9 +114,11 @@ export async function DELETE(req: Request) {
       where: { id }
     });
     
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: 'Node deleted successfully' });
   } catch (error: any) {
-    console.error('Error deleting node:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error.code === 'P2025') {
+        return NextResponse.json({ error: 'Node not found' }, { status: 404 });
+    }
+    return handleApiError(error, 'Error deleting node');
   }
 }
