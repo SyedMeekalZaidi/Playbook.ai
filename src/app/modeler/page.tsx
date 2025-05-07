@@ -55,9 +55,13 @@ export default function ModelerPage() {
     setLocalShowNameDialog(showNameDialog);
   }, [showNameDialog]);
 
+  const openModelerModal = () => {
+    setLocalShowNameDialog(true);
+  };
+
   return (
     <div className="page-container">
-      <NavBar />
+      <NavBar onModelerClick={openModelerModal} />
       <main className={`${styles.main} pt-4`}>
         <h1 className={styles.title}>BPMN Process Modeler</h1>
         <p className={styles.description}>

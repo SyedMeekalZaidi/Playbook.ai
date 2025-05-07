@@ -6,17 +6,19 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from './ClientSessionProvider';
 import { motion } from 'framer-motion';
-// Import bootstrap icons directly without the CSS import
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
-const NavBar: React.FC = () => {
+interface NavBarProps {
+  onModelerClick?: () => void;
+}
+
+const NavBar: React.FC<NavBarProps> = ({ onModelerClick }) => {
   const router = useRouter();
   const pathname = usePathname();
   const { user, signOut } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [isNavExpanded, setIsNavExpanded] = useState(false);
 
-  // Handle scrolling effect
   useEffect(() => {
     const handleScroll = () => {
       const isScrolled = window.scrollY > 10;
@@ -39,6 +41,15 @@ const NavBar: React.FC = () => {
     setIsNavExpanded(!isNavExpanded);
   };
 
+  const handleModelerClick = () => {
+    if (pathname === '/modeler' && onModelerClick) {
+      onModelerClick();
+    } else {
+      router.push('/modeler');
+    }
+    setIsNavExpanded(false); // Close mobile menu if open
+  };
+
   return (
     <header 
       className={`fixed top-0 z-50 w-full ${
@@ -49,24 +60,24 @@ const NavBar: React.FC = () => {
         <div className="flex items-center justify-between">
           {/* Logo and Brand Name */}
           <div className="flex items-center">
-        <Link href="/" className="flex items-center group">
-          <motion.div 
-            initial={{ scale: 1 }}
-            whileHover={{ scale: 1.05 }}
-            transition={{ duration: 0.2 }}
-          >
-            <Image 
-          src="/rose-logo.png"
-          alt="Process Mapping Tool"
-          width={40}
-          height={40}
-          className="object-contain"
-          priority
-            />
-          </motion.div>
-          <span className="ml-3 text-xl font-bold text-gold hover:text-gold-light transition-colors">
-            Process Mapping Tool
-          </span>
+            <Link href="/" className="flex items-center group">
+              <motion.div 
+                initial={{ scale: 1 }}
+                whileHover={{ scale: 1.05 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Image 
+                  src="/rose-logo.png"
+                  alt="Process Mapping Tool"
+                  width={40}
+                  height={40}
+                  className="object-contain"
+                  priority
+                />
+              </motion.div>
+              <span className="ml-3 text-xl font-bold text-gold hover:text-gold-light transition-colors">
+                Process Mapping Tool
+              </span>
             </Link>
           </div>
 
@@ -100,8 +111,8 @@ const NavBar: React.FC = () => {
                     Dashboard
                   </Link>
                   
-                  <Link 
-                    href="/modeler" 
+                  <button
+                    onClick={handleModelerClick}
                     className={`px-3 py-2 rounded-md font-medium flex items-center transition mx-2 my-2 md:my-0
                       ${pathname === '/modeler' 
                         ? 'text-gold bg-white/10' 
@@ -109,7 +120,7 @@ const NavBar: React.FC = () => {
                   >
                     <i className="bi bi-diagram-3 mr-2"></i>
                     Modeler
-                  </Link>
+                  </button>
                   
                   {/* User Profile Dropdown */}
                   <div className="relative group mx-2 my-2 md:my-0 md:ml-4">
