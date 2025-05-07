@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './page.module.css';
 import NavBar from '../../components/NavBar';
 import BpmnModelerComponent from '../../components/BpmnModeler';
@@ -37,7 +37,7 @@ export default function ModelerPage() {
     setProcessName,
     setSelectedExistingProcess,
     setActiveTab,
-    setShowDeleteConfirm, // Added to destructure
+    setShowDeleteConfirm,
     handleStartNewDiagram,
     handleLoadExistingProcess,
     handleElementSelect,
@@ -48,6 +48,12 @@ export default function ModelerPage() {
     handleElementDelete,
     handleSaveSuccess,
   } = useModeler();
+
+  const [localShowNameDialog, setLocalShowNameDialog] = useState(showNameDialog);
+
+  useEffect(() => {
+    setLocalShowNameDialog(showNameDialog);
+  }, [showNameDialog]);
 
   return (
     <div className="page-container">
@@ -60,7 +66,8 @@ export default function ModelerPage() {
 
         <ModalComponents
           isClient={isClient}
-          showNameDialog={showNameDialog}
+          showNameDialog={localShowNameDialog}
+          setShowNameDialog={setLocalShowNameDialog}
           showDeleteConfirm={showDeleteConfirm}
           isLoadingPlaybooks={isLoadingPlaybooks}
           playbooks={playbooks}
@@ -95,7 +102,7 @@ export default function ModelerPage() {
           </div>
         )}
 
-        {processId && !showNameDialog && (
+        {processId && !localShowNameDialog && (
           <>
             <div className={styles.processHeader}>
               <h2>{processName}</h2>
@@ -130,7 +137,7 @@ export default function ModelerPage() {
                 </button>
                 <button
                   className={styles.deleteButton}
-                  onClick={() => setShowDeleteConfirm(true)} // Use destructured setShowDeleteConfirm
+                  onClick={() => setShowDeleteConfirm(true)}
                 >
                   Delete Process
                 </button>

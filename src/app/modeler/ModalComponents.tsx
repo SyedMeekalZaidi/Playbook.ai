@@ -3,11 +3,11 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Button, Form, Tab, Tabs } from 'react-bootstrap';
 import { Playbook, Process } from './interfaces';
-import styles from './page.module.css';
 
 interface ModalComponentsProps {
   isClient: boolean;
   showNameDialog: boolean;
+  setShowNameDialog: (show: boolean) => void;
   showDeleteConfirm: boolean;
   isLoadingPlaybooks: boolean;
   playbooks: Playbook[];
@@ -46,6 +46,7 @@ const ClientOnlyModal = ({ children, ...props }: React.ComponentProps<typeof Mod
 export const ModalComponents: React.FC<ModalComponentsProps> = ({
   isClient,
   showNameDialog,
+  setShowNameDialog,
   showDeleteConfirm,
   isLoadingPlaybooks,
   playbooks,
@@ -69,9 +70,20 @@ export const ModalComponents: React.FC<ModalComponentsProps> = ({
   return (
     <>
       {isClient && (
-        <ClientOnlyModal show={showNameDialog} backdrop="static" keyboard={false}>
+        <ClientOnlyModal 
+          show={showNameDialog} 
+          onHide={() => setShowNameDialog(false)} 
+          backdrop="static" 
+          keyboard={false}
+        >
           <Modal.Header>
             <Modal.Title>BPMN Process Modeler</Modal.Title>
+            <Button
+              variant="close"
+              onClick={() => setShowNameDialog(false)}
+              style={{ position: 'absolute', right: '10px', top: '10px', padding: '0.25rem', lineHeight: '1' }}
+              aria-label="Close"
+            />
           </Modal.Header>
           <Modal.Body>
             {isLoadingPlaybooks ? (
