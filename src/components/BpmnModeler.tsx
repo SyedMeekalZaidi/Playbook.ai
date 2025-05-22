@@ -170,7 +170,11 @@ const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props
             // Update UI elements with database information
             if (databaseIntegration) {
               debugLog('Syncing database elements with diagram');
-              databaseIntegration.syncDatabaseElements();
+              if (typeof databaseIntegration.syncDatabaseElements === 'function') {
+                databaseIntegration.syncDatabaseElements();
+              } else {
+                console.warn('[BpmnModeler] databaseIntegration.syncDatabaseElements is not a function. Syncing might not occur.');
+              }
             }
           })
           .catch((err: any) => {
@@ -185,7 +189,7 @@ const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props
       debugLog('No existing XML found, creating new diagram');
       createNewDiagram();
     }
-  }, [modeler, databaseIntegration, processes, processId, nodes]);
+  }, [modeler, databaseIntegration, processes, processId]); // Removed `nodes` from dependency array
   
   // Create a new diagram
   const createNewDiagram = async () => {

@@ -6,7 +6,7 @@ interface NodeData {
   id?: string; // Optional: ID might not be provided for new nodes
   name: string;
   type: string;
-  description: string | null;
+  shortDescription: string | null; // Changed from description
   parameters: ProcessParameterData[];
 }
 
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
           create: nodeList.map((node: NodeData) => ({
             id: node.id || crypto.randomUUID(),
             name: node.name,
-            shortDescription: node.description,
+            shortDescription: node.shortDescription, // Ensure this matches
             type: node.type,
             updatedAt: new Date(), // Manually setting updatedAt
             ProcessParameter: {

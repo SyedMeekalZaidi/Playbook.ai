@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Modal, Button, Form, Tab, Tabs } from 'react-bootstrap';
+import { Modal, Button, Form, Tab, Tabs, Spinner, Alert, Nav } from 'react-bootstrap';
 import { Playbook, Process } from './interfaces';
 
 interface ModalComponentsProps {
@@ -75,139 +75,123 @@ export const ModalComponents: React.FC<ModalComponentsProps> = ({
           onHide={() => setShowNameDialog(false)} 
           backdrop="static" 
           keyboard={false}
+          centered
         >
-          <Modal.Header>
-            <Modal.Title>BPMN Process Modeler</Modal.Title>
-            <Button
-              variant="close"
-              onClick={() => setShowNameDialog(false)}
-              style={{ position: 'absolute', right: '10px', top: '10px', padding: '0.25rem', lineHeight: '1' }}
-              aria-label="Close"
-            />
+          <Modal.Header closeButton>
+            <Modal.Title>Process Modeler Setup</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {isLoadingPlaybooks ? (
-              <div className="text-center my-4">
-                <div className="spinner-border text-primary" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-                <p className="mt-2">Loading playbooks...</p>
-              </div>
+              <div className="text-center"><Spinner animation="border" /> Loading Playbooks...</div>
+            ) : playbooks.length === 0 && !isLoadingPlaybooks ? (
+                <Alert variant="warning">
+                  No playbooks found. Please <Alert.Link href="/playbooks/new-playbook">create a playbook</Alert.Link> first.
+                </Alert>
             ) : (
               <>
-                {playbooks.length > 0 ? (
-                  <Form.Group className="mb-3">
-                    <Form.Label>Select a playbook:</Form.Label>
-                    <Form.Select
-                      value={playbookId}
-                      onChange={(e) => setPlaybookId(e.target.value)}
+                <Form.Group className="mb-3">
+                  <Form.Label>Select Playbook</Form.Label>
+                  <Form.Control
+                    as="select"
+                    value={playbookId}
+                    onChange={(e) => setPlaybookId(e.target.value)}
+                    disabled={isLoadingPlaybooks || playbooks.length === 0}
+                  >
+                    <option value="">-- Select a Playbook --</option>
+                    {playbooks.map((pb) => (
+                      <option key={pb.id} value={pb.id}>{pb.name}</option>
+                    ))}
+                  </Form.Control>
+                </Form.Group>
+
+                {playbookId && (
+                  <Nav variant="tabs" activeKey={activeTab} onSelect={(k) => setActiveTab(k || 'new')}>
+                    <Nav.Item>
+                      <Nav.Link eventKey="new">Create New Process</Nav.Link>
+                    </Nav.Item>
+                    <Nav.Item>
+                      <Nav.Link eventKey="load">Load Existing Process</Nav.Link>
+                    </Nav.Item>
+                  </Nav>
+                )}
+
+                {playbookId && activeTab === 'new' && (
+                  <div className="mt-3">
+                    <Form.Group className="mb-3">
+                      <Form.Label>New Process Name</Form.Label>
+                      <Form.Control
+                        type="text"
+                        placeholder="Enter name for the new process"
+                        value={processName}
+                        onChange={(e) => setProcessName(e.target.value)}
+                      />
+                    </Form.Group>
+                    <Button 
+                      variant="primary" 
+                      onClick={handleStartNewDiagram} 
+                      disabled={isLoading || !processName.trim() || !playbookId}
                     >
-                      {playbooks.map(pb => (
-                        <option key={pb.id} value={pb.id}>{pb.name}</option>
-                      ))}
-                    </Form.Select>
-                    <div className="text-muted small mt-1">
-                      Total playbooks: {playbooks.length}
-                    </div>
-                  </Form.Group>
-                ) : (
-                  <div className="alert alert-warning">
-                    No playbooks available. Creating a default playbook...
+                      {isLoading ? <Spinner as="span" animation="border" size="sm" /> : "Start Modeling"}
+                    </Button>
                   </div>
                 )}
 
-                <Tabs
-                  activeKey={activeTab}
-                  onSelect={(k) => k && setActiveTab(k)}
-                  className="mb-3"
-                >
-                  <Tab eventKey="new" title="Create New Process">
-                    <Form.Group className="mb-3">
-                      <Form.Label>Enter a name for your new process:</Form.Label>
-                      <Form.Control
-                        type="text"
-                        value={processName}
-                        onChange={(e) => setProcessName(e.target.value)}
-                        placeholder="My Business Process"
-                        autoFocus
-                        disabled={!playbookId}
-                      />
-                    </Form.Group>
-                    <Button
-                      variant="primary"
-                      className="w-100"
-                      onClick={handleStartNewDiagram}
-                      disabled={!processName.trim() || !playbookId || isLoading || isLoadingPlaybooks}
-                    >
-                      {isLoading ? 'Creating...' : 'Create New Process'}
-                    </Button>
-                  </Tab>
-                  <Tab eventKey="load" title="Load Existing Process">
+                {playbookId && activeTab === 'load' && (
+                  <div className="mt-3">
                     {isLoadingProcesses ? (
-                      <div className="text-center my-4">
-                        <div className="spinner-border text-primary" role="status">
-                          <span className="visually-hidden">Loading...</span>
-                        </div>
-                        <p className="mt-2">Loading processes...</p>
-                      </div>
-                    ) : playbookProcesses.length > 0 ? (
+                      <div className="text-center"><Spinner animation="border" /> Loading Processes...</div>
+                    ) : playbookProcesses.length === 0 ? (
+                       <Alert variant="info">No existing processes in this playbook. Create a new one!</Alert>
+                    ) : (
                       <>
                         <Form.Group className="mb-3">
-                          <Form.Label>Select an existing process:</Form.Label>
-                          <Form.Select
+                          <Form.Label>Select Existing Process</Form.Label>
+                          <Form.Control
+                            as="select"
                             value={selectedExistingProcess}
                             onChange={(e) => setSelectedExistingProcess(e.target.value)}
                           >
-                            <option value="">-- Select a process --</option>
-                            {playbookProcesses.map(proc => (
+                            <option value="">-- Select a Process --</option>
+                            {playbookProcesses.map((proc) => (
                               <option key={proc.id} value={proc.id}>{proc.name}</option>
                             ))}
-                          </Form.Select>
+                          </Form.Control>
                         </Form.Group>
-                        <Button
-                          variant="primary"
-                          className="w-100"
-                          onClick={handleLoadExistingProcess}
-                          disabled={!selectedExistingProcess || isLoading}
+                        <Button 
+                          variant="primary" 
+                          onClick={handleLoadExistingProcess} 
+                          disabled={isLoading || !selectedExistingProcess}
                         >
-                          {isLoading ? 'Loading...' : 'Load Process'}
+                          {isLoading ? <Spinner as="span" animation="border" size="sm" /> : "Load Process"}
                         </Button>
                       </>
-                    ) : (
-                      <div className="alert alert-info">
-                        No processes available in this playbook. Create a new one instead.
-                      </div>
                     )}
-                  </Tab>
-                </Tabs>
+                  </div>
+                )}
               </>
             )}
           </Modal.Body>
-          <Modal.Footer className="justify-content-between">
-            <div className="text-muted small">
-              {activeTab === 'new' ? 'Creating a new process...' : 'Loading an existing process...'}
-            </div>
-          </Modal.Footer>
         </ClientOnlyModal>
       )}
 
       {isClient && (
-        <ClientOnlyModal show={showDeleteConfirm} onHide={() => setShowDeleteConfirm(false)}>
+        <ClientOnlyModal
+          show={showDeleteConfirm}
+          onHide={() => setShowDeleteConfirm(false)}
+          centered
+        >
           <Modal.Header closeButton>
             <Modal.Title>Confirm Deletion</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <div className="alert alert-danger">
-              <p>Are you sure you want to delete the process "{processNameForDelete}"?</p>
-              <p>This action cannot be undone and all associated data will be permanently removed.</p>
-            </div>
+            Are you sure you want to delete the process "<strong>{processNameForDelete}</strong>"? This action cannot be undone.
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={handleDeleteProcess}>
-              Delete Process
+            <Button variant="danger" onClick={handleDeleteProcess} disabled={isLoading}>
+              {isLoading ? <Spinner as="span" animation="border" size="sm" /> : "Delete Process"}
             </Button>
           </Modal.Footer>
         </ClientOnlyModal>

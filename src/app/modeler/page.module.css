@@ -40,17 +40,11 @@
 }
 
 .modelerWrapper {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  margin-bottom: 2rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  overflow: hidden;
+  flex-grow: 1;
+  border: 1px solid #ccc;
   background-color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  height: calc(100vh - 300px); /* Make it responsive to viewport height */
-  min-height: 700px; /* Set minimum height */
+  position: relative; /* For bpmn-js container */
+  min-height: 500px; /* Ensure it has some height */
 }
 
 .modelerContainer { /* Increase from 600px to 800px */
@@ -123,43 +117,41 @@
 }
 
 .debugSection {
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  padding: 1rem;
   background-color: #fff;
-  padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 0.25rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .debugHeader {
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid #eee;
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
 }
 
 .debugHeader h2 {
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-  color: #333;
+  font-size: 1.25rem;
+  color: #14213D;
 }
 
 .debugHeader p {
-  color: #666;
-  margin: 0;
+  font-size: 0.875rem;
+  color: #6c757d;
 }
 
 .selectedElement {
-  background-color: #f5f5f5;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: #e9ecef;
+  border-radius: 0.25rem;
 }
 
 .selectedElement h3 {
-  font-size: 1.1rem;
-  margin-top: 0;
+  font-size: 1rem;
   margin-bottom: 0.5rem;
-  color: #333;
 }
 
 .elementDetails {
@@ -169,99 +161,93 @@
 }
 
 .elementDetails div {
-  font-size: 14px;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
 }
 
 .debugTable {
-  width: 100%;
-  overflow-x: auto;
-  margin-bottom: 1.5rem;
+  flex-grow: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
 }
 
 .debugTable table {
   width: 100%;
+  font-size: 0.8rem;
   border-collapse: collapse;
 }
 
 .debugTable th, 
 .debugTable td {
+  padding: 0.4rem;
   text-align: left;
-  padding: 10px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #dee2e6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .debugTable th {
-  background-color: #f5f5f5;
-  font-weight: 600;
-  color: #333;
+  background-color: #f8f9fa;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
-.debugTable tr:hover {
-  background-color: #f9f9f9;
+.debugTable td:last-child, .debugTable th:last-child {
+    /* width: 1%; */ /* To make it shrink if needed */
 }
 
 .emptyState {
-  text-align: center;
-  color: #999;
-  font-style: italic;
-  padding: 2rem 0;
+  text-align: center !important;
+  padding: 2rem !important;
+  color: #6c757d;
 }
 
 .badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
+  padding: 0.3em 0.5em;
+  font-size: 0.75em;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+  border-radius: 0.25rem;
+  color: #fff;
 }
 
-.createBadge {
-  background-color: #e6f7e6;
-  color: #2e7d32;
-}
-
-.updateBadge {
-  background-color: #e3f2fd;
-  color: #1565c0;
-}
-
-.deleteBadge {
-  background-color: #ffebee;
-  color: #c62828;
-}
-
-.saveBadge {
-  background-color: #fff8e1;
-  color: #ff8f00;
-}
+.createBadge { background-color: #28a745; } /* Green */
+.updateBadge { background-color: #ffc107; color: #212529;} /* Yellow */
+.deleteBadge { background-color: #dc3545; } /* Red */
+.saveBadge { background-color: #007bff; }   /* Blue */
+.loadBadge { background-color: #17a2b8; }  /* Teal */
 
 .databaseStats {
   display: flex;
-  gap: 1rem;
-  margin-top: 1.5rem;
+  justify-content: space-around;
+  margin-top: auto; /* Pushes to bottom if debugSection is flex column */
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
 }
 
 .statCard {
-  flex: 1;
-  background-color: #f9f9f9;
-  border: 1px solid #eee;
-  border-radius: 4px;
-  padding: 1rem;
   text-align: center;
 }
 
 .statCard h4 {
-  margin-top: 0;
-  margin-bottom: 0.5rem;
-  color: #555;
-  font-size: 14px;
+  font-size: 0.875rem;
+  color: #6c757d;
+  margin-bottom: 0.25rem;
 }
 
 .statValue {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #333;
+  color: #14213D;
 }
 
 .errorPanel {
@@ -365,4 +351,66 @@
 .formButton:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+}
+
+.modelerPageContainer {
+  padding-top: 70px; /* Adjusted for fixed navbar height */
+  padding-bottom: 1rem;
+  height: 100vh; 
+  display: flex;
+  flex-direction: column;
+}
+
+.modelerLayoutRow {
+  flex-grow: 1; /* Allow row to take available space */
+  display: flex; /* Use flex for columns */
+  min-height: 0; /* Prevent flex items from overflowing */
+}
+
+.modelerColumn {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Full height of the row */
+  padding: 0.5rem;
+}
+
+.debugColumn {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Full height of the row */
+  padding: 0.5rem;
+  overflow-y: auto; /* Allow debug panel to scroll */
+  background-color: #f8f9fa;
+  border-left: 1px solid #dee2e6;
+}
+
+.modelerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: #fff;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.modelerHeader h3 {
+  margin-bottom: 0;
+  color: #14213D;
+}
+
+.modelerLoading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  font-size: 1.2rem;
+  color: #6c757d;
+}
+
+.stickyError {
+  position: sticky;
+  top: 10px; /* Adjust as needed */
+  z-index: 1050; /* Ensure it's above other content */
+  margin: 1rem;
 }

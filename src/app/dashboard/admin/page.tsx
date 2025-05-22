@@ -1,6 +1,6 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import NavBar from '@/components/NavBar';
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
@@ -10,10 +10,24 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Container from 'react-bootstrap/Container';
 import Spinner from 'react-bootstrap/Spinner';
+import Tooltip from 'react-bootstrap/Tooltip';
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Alert from 'react-bootstrap/Alert';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { FiShare2, FiXCircle, FiCheckCircle, FiHelpCircle, FiPlusCircle, FiTrash2 } from 'react-icons/fi';
 import { useUser } from '@/components/UserContext';
-import { PlaybookAPI } from '@/services/api'; // Import the API service
-import { Playbook, Process as PlaybookProcess } from '@/types/api'; // Import Playbook type
+import { PlaybookAPI } from '@/services/api';
+import { Playbook, Role as PrismaRole } from '@/types/api';
+
+interface EmailInput {
+    id: string;
+    email: string;
+    status: 'idle' | 'checking' | 'valid' | 'invalid';
+    userId?: string;
+    error?: string;
+}
+
+type ShareType = 'IMPLEMENTOR' | 'COLLABORATOR';
 
 export default function Dashboard() {
     const router = useRouter();
@@ -28,10 +42,18 @@ export default function Dashboard() {
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [playbooksLoading, setPlaybooksLoading] = useState<boolean>(true);
+
+    // Share Modal State
     const [showShareModal, setShowShareModal] = useState(false);
-    const [shareEmail, setShareEmail] = useState('');
+    const [emailInputValue, setEmailInputValue] = useState('');
+    const [emailsToShare, setEmailsToShare] = useState<EmailInput[]>([]);
+    const [shareType, setShareType] = useState<ShareType>('COLLABORATOR');
+    const [collaboratorRole, setCollaboratorRole] = useState<PrismaRole>(PrismaRole.COLLABORATOR);
     const [sharing, setSharing] = useState(false);
     const [shareError, setShareError] = useState<string | null>(null);
+    const [shareResults, setShareResults] = useState<Array<{ email: string, success: boolean, message: string }>>([]);
+
+    const emailInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!user) return;
@@ -95,36 +117,113 @@ export default function Dashboard() {
         setOpenPlaybookCard(true);
     };
 
-    const handleClosePlaybookCard = () => {
-        setOpenPlaybookCard(false);
-        setSelectedPlaybook(undefined);
+    const handleOpenShareModal = (playbook: Playbook) => {
+        setSelectedPlaybook(playbook);
+        setShowShareModal(true);
         setShareError(null);
-        setShareEmail('');
+        setEmailsToShare([]);
+        setEmailInputValue('');
+        setShareType('COLLABORATOR');
+        setCollaboratorRole(PrismaRole.COLLABORATOR);
+        setShareResults([]);
     };
 
-    const handleSharePlaybook = async () => {
-        if (!selectedPlaybook || !shareEmail.trim()) {
-            setShareError("Playbook and email are required to share.");
+    const handleCloseShareModal = () => {
+        setShowShareModal(false);
+        setShareError(null);
+        setEmailsToShare([]);
+        setEmailInputValue('');
+        setShareResults([]);
+    };
+
+    const handleAddEmail = async () => {
+        if (!emailInputValue.trim() || !/^\S+@\S+\.\S+$/.test(emailInputValue.trim())) {
+            setShareError("Please enter a valid email address.");
             return;
         }
-        setSharing(true);
+        const newEmail = emailInputValue.trim().toLowerCase();
+        if (emailsToShare.find(e => e.email === newEmail)) {
+            setShareError("This email has already been added.");
+            setEmailInputValue('');
+            return;
+        }
+
+        const emailEntry: EmailInput = { id: crypto.randomUUID(), email: newEmail, status: 'checking' };
+        setEmailsToShare(prev => [...prev, emailEntry]);
+        setEmailInputValue('');
         setShareError(null);
+
         try {
-            const userRes = await fetch(`/api/user?email=${shareEmail}`);
+            const userRes = await fetch(`/api/user?email=${newEmail}`);
             const userData = await userRes.json();
 
             if (!userRes.ok || !userData?.id) {
-                throw new Error("User not found with the provided email.");
+                setEmailsToShare(prev => prev.map(e => e.id === emailEntry.id ? { ...e, status: 'invalid', error: userData.error || "User not found." } : e));
+            } else {
+                setEmailsToShare(prev => prev.map(e => e.id === emailEntry.id ? { ...e, status: 'valid', userId: userData.id } : e));
             }
+        } catch (err: any) {
+            setEmailsToShare(prev => prev.map(e => e.id === emailEntry.id ? { ...e, status: 'invalid', error: "Error validating email." } : e));
+        }
+    };
 
-            await PlaybookAPI.share(selectedPlaybook.id, { userId: userData.id });
-            setShowShareModal(false);
-            setShareEmail('');
+    const handleRemoveEmail = (idToRemove: string) => {
+        setEmailsToShare(prev => prev.filter(e => e.id !== idToRemove));
+    };
+
+    const handleSharePlaybook = async () => {
+        if (!selectedPlaybook) {
+            setShareError("No playbook selected for sharing.");
+            return;
+        }
+        const validShares = emailsToShare.filter(e => e.status === 'valid' && e.userId);
+        if (validShares.length === 0) {
+            setShareError("No valid users to share with. Please add and validate emails.");
+            return;
+        }
+
+        setSharing(true);
+        setShareError(null);
+        setShareResults([]);
+
+        const sharesPayload = validShares.map(e => ({
+            email: e.email,
+            targetUserId: e.userId!,
+            shareType: shareType,
+            collaboratorRole: shareType === 'COLLABORATOR' ? collaboratorRole : undefined,
+        }));
+
+        try {
+            const response = await PlaybookAPI.shareAdvanced(selectedPlaybook.id, { shares: sharesPayload });
+            if (response.results) {
+                setShareResults(response.results);
+            } else {
+                throw new Error(response.error || "Unknown error during sharing operation.");
+            }
         } catch (error: any) {
             setShareError(error.message || "Error sharing playbook.");
         } finally {
             setSharing(false);
         }
+    };
+
+    const implementorTooltip = (
+        <Tooltip id="implementor-tooltip">
+            Shares a complete, independent copy of the playbook. The recipient becomes the owner of this new copy and can modify it freely. The original playbook remains unaffected.
+        </Tooltip>
+    );
+
+    const collaboratorTooltip = (
+        <Tooltip id="collaborator-tooltip">
+            Grants the user access to this original playbook with specific permissions (e.g., view, edit). Changes made by a collaborator affect this playbook directly.
+        </Tooltip>
+    );
+
+    const handleClosePlaybookCard = () => {
+        setOpenPlaybookCard(false);
+        setSelectedPlaybook(undefined);
+        setShareError(null);
+        setEmailInputValue('');
     };
 
     return (
@@ -159,10 +258,23 @@ export default function Dashboard() {
                             {playbooks.map((playbook) => (
                                 <Col key={playbook.id}>
                                     <Card className="h-100 shadow-sm">
-                                        <Card.Body>
-                                            <Card.Title>{playbook.name}</Card.Title>
-                                            <Card.Text>{playbook.shortDescription || "No description available."}</Card.Text>
-                                            <Button variant="outline-dark" onClick={() => handleOpenPlaybookCard(playbook)}>View</Button>
+                                        <Card.Body className="d-flex flex-column">
+                                            <div className="d-flex justify-content-between align-items-start mb-2">
+                                                <Card.Title className="mb-0">{playbook.name}</Card.Title>
+                                                <Button
+                                                    variant="link"
+                                                    className="p-0 text-secondary"
+                                                    onClick={() => handleOpenShareModal(playbook)}
+                                                    aria-label={`Share ${playbook.name}`}
+                                                    style={{ fontSize: '1.25rem' }}
+                                                >
+                                                    <FiShare2 />
+                                                </Button>
+                                            </div>
+                                            <Card.Text className="text-muted small flex-grow-1">
+                                                {playbook.shortDescription || "No description available."}
+                                            </Card.Text>
+                                            <Button variant="outline-dark" onClick={() => handleOpenPlaybookCard(playbook)} className="mt-auto">View</Button>
                                         </Card.Body>
                                     </Card>
                                 </Col>
@@ -218,37 +330,135 @@ export default function Dashboard() {
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant="secondary" onClick={handleClosePlaybookCard}>Close</Button>
-                    <Button variant="warning" onClick={() => { setOpenPlaybookCard(false); setShowShareModal(true); }}>Share</Button>
+                    <Button variant="warning" onClick={() => {
+                        if (selectedPlaybook) {
+                            handleOpenShareModal(selectedPlaybook);
+                        }
+                        setOpenPlaybookCard(false);
+                    }}>Share</Button>
                     <Button variant="primary" style={{ backgroundColor: '#14213D', color: 'white' }} onClick={() => router.push(`/playbook/${selectedPlaybook?.id}`)}>Open Playbook</Button>
                 </Modal.Footer>
             </Modal>
 
-            <Modal show={showShareModal} onHide={() => { setShowShareModal(false); setShareError(null); setShareEmail(''); }} centered>
+            <Modal show={showShareModal} onHide={handleCloseShareModal} centered size="lg">
                 <Modal.Header closeButton style={{ backgroundColor: '#14213D', color: 'white' }}>
                     <Modal.Title>Share {selectedPlaybook?.name}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    {shareError && <div className="alert alert-danger">{shareError}</div>}
-                    <Form.Group>
-                        <Form.Label>Email of user to share with</Form.Label>
-                        <Form.Control
-                            type="email"
-                            value={shareEmail}
-                            onChange={(e) => setShareEmail(e.target.value)}
-                            placeholder="e.g. user@example.com"
-                        />
+                    {shareError && <Alert variant="danger">{shareError}</Alert>}
+                    {shareResults.length > 0 && (
+                        <div className="mb-3">
+                            <h5>Sharing Results:</h5>
+                            {shareResults.map((res, index) => (
+                                <Alert key={index} variant={res.success ? 'success' : 'danger'}>
+                                    <strong>{res.email}:</strong> {res.message}
+                                </Alert>
+                            ))}
+                        </div>
+                    )}
+
+                    <Form.Group className="mb-3">
+                        <Form.Label>User Emails to Share With</Form.Label>
+                        <div className="d-flex">
+                            <Form.Control
+                                type="email"
+                                ref={emailInputRef}
+                                value={emailInputValue}
+                                onChange={(e) => setEmailInputValue(e.target.value)}
+                                placeholder="e.g. user@example.com"
+                                onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddEmail(); }}}
+                            />
+                            <Button variant="outline-primary" onClick={handleAddEmail} className="ms-2" style={{ color: '#14213D', borderColor: '#14213D' }}>
+                                <FiPlusCircle className="me-1" /> Add
+                            </Button>
+                        </div>
                     </Form.Group>
+
+                    {emailsToShare.length > 0 && (
+                        <div className="mb-3 border p-2 rounded">
+                            <h6>Users to be invited:</h6>
+                            {emailsToShare.map(e => (
+                                <div key={e.id} className="d-flex justify-content-between align-items-center mb-1 p-1 bg-light rounded">
+                                    <span>{e.email}</span>
+                                    <div>
+                                        {e.status === 'checking' && <Spinner animation="border" size="sm" className="me-2" />}
+                                        {e.status === 'valid' && <FiCheckCircle color="green" className="me-2" />}
+                                        {e.status === 'invalid' && (
+                                            <OverlayTrigger placement="top" overlay={<Tooltip id={`tooltip-${e.id}`}>{e.error || "Invalid email"}</Tooltip>}>
+                                                <FiXCircle color="red" className="me-2" />
+                                            </OverlayTrigger>
+                                        )}
+                                        <Button variant="link" size="sm" onClick={() => handleRemoveEmail(e.id)} className="p-0 text-danger">
+                                            <FiTrash2 />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <Form.Group className="mb-3">
+                        <Form.Label>Share As</Form.Label>
+                        <div>
+                            <Form.Check
+                                type="radio"
+                                id="share-implementor"
+                                label={
+                                    <>
+                                        Implementor (Share as a Copy)
+                                        <OverlayTrigger placement="right" overlay={implementorTooltip}>
+                                            <FiHelpCircle className="ms-1" style={{ cursor: 'pointer' }} />
+                                        </OverlayTrigger>
+                                    </>
+                                }
+                                name="shareType"
+                                value="IMPLEMENTOR"
+                                checked={shareType === 'IMPLEMENTOR'}
+                                onChange={(e) => setShareType(e.target.value as ShareType)}
+                            />
+                            <Form.Check
+                                type="radio"
+                                id="share-collaborator"
+                                label={
+                                    <>
+                                        Collaborator (Grant Access)
+                                        <OverlayTrigger placement="right" overlay={collaboratorTooltip}>
+                                            <FiHelpCircle className="ms-1" style={{ cursor: 'pointer' }} />
+                                        </OverlayTrigger>
+                                    </>
+                                }
+                                name="shareType"
+                                value="COLLABORATOR"
+                                checked={shareType === 'COLLABORATOR'}
+                                onChange={(e) => setShareType(e.target.value as ShareType)}
+                            />
+                        </div>
+                    </Form.Group>
+
+                    {shareType === 'COLLABORATOR' && (
+                        <Form.Group className="mb-3">
+                            <Form.Label>Collaborator Role</Form.Label>
+                            <Form.Select
+                                value={collaboratorRole}
+                                onChange={(e) => setCollaboratorRole(e.target.value as PrismaRole)}
+                            >
+                                <option value={PrismaRole.COLLABORATOR}>Collaborator (Can view and edit content)</option>
+                                <option value={PrismaRole.ADMIN}>Admin (Full control over the playbook)</option>
+                            </Form.Select>
+                        </Form.Group>
+                    )}
+
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={() => { setShowShareModal(false); setShareError(null); setShareEmail(''); }}>Cancel</Button>
+                    <Button variant="secondary" onClick={handleCloseShareModal}>Cancel</Button>
                     <Button
                         variant="primary"
                         onClick={handleSharePlaybook}
-                        disabled={sharing || !shareEmail.trim()}
-                        style={{ backgroundColor: '#14213D', color: 'white' }}
+                        disabled={sharing || emailsToShare.filter(e => e.status === 'valid').length === 0}
+                        style={{ backgroundColor: '#FEC872', color: '#14213D', borderColor: '#FEC872' }}
                     >
                         {sharing ? <Spinner size="sm" animation="border" className="me-2" /> : null}
-                        Share
+                        Confirm Share
                     </Button>
                 </Modal.Footer>
             </Modal>

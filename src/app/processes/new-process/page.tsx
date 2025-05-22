@@ -16,12 +16,12 @@ import {
     Process as ProcessType, 
     Node as NodeType, 
     ProcessParameter as ProcessParameterType,
-    ProcessDependency as ProcessDependencyType 
+    CreateProcessPayload
 } from '@/types/api';
+import { PlaybookAPI, ProcessAPI } from '@/services/api';
 
 export default function NewProcessPage() {
     const searchParams = useSearchParams();
-    // the playbook this process belongs to.
     const playbookId = searchParams.get('playbookId');
 
     if (!playbookId){
@@ -30,7 +30,6 @@ export default function NewProcessPage() {
 
     const router = useRouter();
     const returnEndpoint = `/playbook/${playbookId}`
-
 
     const [playbook, setPlaybook] = useState<PlaybookType>();
     const [existingProcesses, setExistingProcesses] = useState<ProcessType[]>([]);
@@ -44,23 +43,19 @@ export default function NewProcessPage() {
     const [nodeList, setNodeList] = useState<NodeType[]>([]);
     const [nextNodeId, setNextNodeId] = useState<number>(1);
     const [processParameters, setProcessParameters] = useState<ProcessParameterType[]>([]);
+    const [nextProcessParamId, setNextProcessParamId] = useState<number>(1);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    // fetch existing processes by playbook id.
     useEffect(() => {
-        const fetchProcesses = async () => {
+        const fetchPlaybookAndProcesses = async () => {
+            if (!playbookId) return;
             try {
                 setIsLoading(true);
-                const endpoint = `/api/playbook?id=${playbookId}&includeProcess=true`
-                const response = await fetch(endpoint);
-
-                if (!response.ok) throw new Error(`[New Process Page] Failed to fetch playbooks: ${response.status}`)
-
-                const data:PlaybookType = await response.json();
+                const data: PlaybookType = await PlaybookAPI.getById(playbookId, { includeProcess: true });
 
                 setPlaybook(data);
                 setExistingProcesses(data.Process || [])
@@ -70,142 +65,144 @@ export default function NewProcessPage() {
             }
 
             setIsLoading(false);
-
         }
 
-        fetchProcesses();
-    }, [])
+        fetchPlaybookAndProcesses();
+    }, [playbookId])
 
-    // Node operations:
     const handleAddNode = () => {
+        const newNodeId = `local-node-${nextNodeId}`;
         const newNode: NodeType = {
-            id: nextNodeId,
+            id: newNodeId,
             name: '',
             type: 'Task',
-            description: null,
-            parameters: [],
+            shortDescription: null,
+            processId: '',
+            ProcessParameter: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
         }
 
         setNodeList([...nodeList, newNode]);
-        handleAddParameter(newNode.id);  // add one parameter as default
+        handleAddParameterToNode(newNode.id);
         setNextNodeId(nextNodeId + 1);
     }
-    const handleRemoveNode = (id: number) => {
+
+    const handleRemoveNode = (id: string) => {
         setNodeList(prevList => prevList.filter(node => node.id !== id));
     }
 
-    // Node Parameter operations:
-    const handleAddParameter = (nodeId: number) => {
-        const maxParamId = nodeList
-            .find(node => node.id === nodeId)
-            ?.parameters.reduce((maxId, param) => Math.max(maxId, param.id), 0) ?? nodeId;
+    const handleAddParameterToNode = (nodeId: string) => {
+        const node = nodeList.find(n => n.id === nodeId);
+        if (!node) return;
 
-        const paramId = Math.round((maxParamId + 0.1) * 100) / 100;
+        const existingParams = node.ProcessParameter || [];
+        const maxParamNumericId = existingParams.reduce((maxId, param) => {
+            const numericPart = parseInt(param.id.split('-').pop() || '0');
+            return Math.max(maxId, numericPart);
+        }, 0);
+        
+        const paramId = `local-param-${nodeId}-${maxParamNumericId + 1}`;
 
-        const newParam: NodeType['parameters'][0] = {
+        const newParam: ProcessParameterType = {
             id: paramId,
             name: '',
             type: 'Checkbox',
             mandatory: false,
             info: '',
             options: [],
+            processId: '',
+            nodeId: nodeId, 
         }
 
         setNodeList(prevList =>
-            prevList.map(node =>
-                node.id === nodeId
-                    ? { ...node, parameters: [...node.parameters, newParam] }
-                    : node
+            prevList.map(n =>
+                n.id === nodeId
+                    ? { ...n, ProcessParameter: [...(n.ProcessParameter || []), newParam] }
+                    : n
             )
         );
     }
 
-    const handleRemoveParameter = (paramId: number) => {
-        console.log("Removing parameter with ID:", paramId);
-
+    const handleRemoveParameterFromNode = (nodeId: string, paramId: string) => {
         setNodeList(prevList => {
             return prevList.map(node => {
-                // Check if this node contains the parameter
-                const hasParameter = node.parameters.some(param => param.id === paramId);
-
-                if (hasParameter) {
-                    // If found, filter out the parameter
+                if (node.id === nodeId) {
                     return {
                         ...node,
-                        parameters: node.parameters.filter(param => param.id !== paramId)
+                        ProcessParameter: (node.ProcessParameter || []).filter(param => param.id !== paramId)
                     };
                 }
-
-                // Otherwise return the node unchanged
                 return node;
             });
         });
     };
 
-    // Process parameter operations:
     const handleAddProcessParameter = () => {
+        const newProcParamId = `local-process-param-${nextProcessParamId}`;
         setProcessParameters([...processParameters, {
+            id: newProcParamId,
             name: '',
             type: 'Textbox',
             mandatory: false,
-            options: []
+            options: [],
+            processId: '',
+            nodeId: null, 
         }]);
+        setNextProcessParamId(nextProcessParamId + 1);
     };
 
-    const handleRemoveProcessParameter = (index: number) => {
-        setProcessParameters(processParameters.filter((_, i) => i !== index));
+    const handleRemoveProcessParameter = (id: string) => {
+        setProcessParameters(processParameters.filter(param => param.id !== id));
     };
 
-    const handleProcessParameterChange = (index: number, field: string, value: any) => {
-        setProcessParameters(processParameters.map((param, i) =>
-            i === index ? { ...param, [field]: value } : param
+    const handleProcessParameterChange = (id: string, field: keyof ProcessParameterType, value: any) => {
+        setProcessParameters(processParameters.map(param =>
+            param.id === id ? { ...param, [field]: value } : param
         ));
     };
 
-    // Handle options for parameters
-    const handleAddProcessParameterOption = (index: number) => {
-        setProcessParameters(processParameters.map((param, i) =>
-            i === index ? { ...param, options: [...param.options, ''] } : param
+    const handleAddProcessParameterOption = (paramId: string) => {
+        setProcessParameters(processParameters.map(param =>
+            param.id === paramId 
+                ? { ...param, options: [...(param.options || []), ''] } 
+                : param
         ));
     };
 
-    const handleProcessParameterOptionChange = (paramIndex: number, optionIndex: number, value: string) => {
-        setProcessParameters(processParameters.map((param, i) =>
-            i === paramIndex
+    const handleProcessParameterOptionChange = (paramId: string, optionIndex: number, value: string) => {
+        setProcessParameters(processParameters.map(param =>
+            param.id === paramId
                 ? {
                     ...param,
-                    options: param.options.map((opt, oi) => oi === optionIndex ? value : opt)
+                    options: (param.options || []).map((opt, oi) => oi === optionIndex ? value : opt)
                   }
                 : param
         ));
     };
 
-    const handleRemoveProcessParameterOption = (paramIndex: number, optionIndex: number) => {
-        setProcessParameters(processParameters.map((param, i) =>
-            i === paramIndex
+    const handleRemoveProcessParameterOption = (paramId: string, optionIndex: number) => {
+        setProcessParameters(processParameters.map(param =>
+            param.id === paramId
                 ? {
                     ...param,
-                    options: param.options.filter((_, oi) => oi !== optionIndex)
+                    options: (param.options || []).filter((_, oi) => oi !== optionIndex)
                   }
                 : param
         ));
     };
 
-    // Handle options for node parameters
-    const handleAddOption = (nodeId: number, paramId: number) => {
+    const handleAddNodeParameterOption = (nodeId: string, paramId: string) => {
         setNodeList(prevList =>
             prevList.map(node =>
                 node.id === nodeId
                     ? {
                         ...node,
-                        parameters: node.parameters.map(param =>
+                        ProcessParameter: (node.ProcessParameter || []).map(param =>
                             param.id === paramId
                                 ? {
                                     ...param,
-                                    options: [
-                                        ...param.options,
-                                        { id: param.options.length, text: '' }
-                                    ]
+                                    options: [...(param.options || []), '']
                                   }
                                 : param
                         )
@@ -215,20 +212,18 @@ export default function NewProcessPage() {
         );
     };
 
-    const handleOptionChange = (nodeId: number, paramId: number, optionId: number, value: string) => {
+    const handleNodeParameterOptionChange = (nodeId: string, paramId: string, optionIndex: number, value: string) => {
         setNodeList(prevList =>
             prevList.map(node =>
                 node.id === nodeId
                     ? {
                         ...node,
-                        parameters: node.parameters.map(param =>
+                        ProcessParameter: (node.ProcessParameter || []).map(param =>
                             param.id === paramId
                                 ? {
                                     ...param,
-                                    options: param.options.map(option =>
-                                        option.id === optionId
-                                            ? { ...option, text: value }
-                                            : option
+                                    options: (param.options || []).map((optionText, optIdx) =>
+                                        optIdx === optionIndex ? value : optionText
                                     )
                                   }
                                 : param
@@ -239,17 +234,17 @@ export default function NewProcessPage() {
         );
     };
 
-    const handleRemoveOption = (nodeId: number, paramId: number, optionId: number) => {
+    const handleRemoveNodeParameterOption = (nodeId: string, paramId: string, optionIndex: number) => {
         setNodeList(prevList =>
             prevList.map(node =>
                 node.id === nodeId
                     ? {
                         ...node,
-                        parameters: node.parameters.map(param =>
+                        ProcessParameter: (node.ProcessParameter || []).map(param =>
                             param.id === paramId
                                 ? {
                                     ...param,
-                                    options: param.options.filter(option => option.id !== optionId)
+                                    options: (param.options || []).filter((_, optIdx) => optIdx !== optionIndex)
                                   }
                                 : param
                         )
@@ -259,7 +254,7 @@ export default function NewProcessPage() {
         );
     };
 
-    const updateNodeType = (id: number, newType: string) => {
+    const updateNodeType = (id: string, newType: string) => {
         setNodeList(prevList =>
             prevList.map(node =>
                 node.id === id ? { ...node, type: newType } : node
@@ -267,43 +262,48 @@ export default function NewProcessPage() {
         );
     }
 
-    const updateQuestionType = (id: number, type: string) => {
+    const updateNodeParameterType = (nodeId: string, paramId: string, type: string) => {
         setNodeList(prevList =>
             prevList.map(node =>
-                node.parameters.find(param => param.id === id)
-                    ? {
-                        ...node,
-                        parameters: node.parameters.map(param =>
-                            param.id === id ? { ...param, type } : param
-                        )
-                      }
-                    : node
+                node.id === nodeId ?
+                {
+                    ...node,
+                    ProcessParameter: (node.ProcessParameter || []).map(param =>
+                        param.id === paramId ? { ...param, type } : param
+                    )
+                }
+                : node
             )
         );
     }
 
-    // Render functions for the UI components
-    const renderQuestionField = (nodeId: number, param: NodeType['parameters'][0]) => {
+    const renderQuestionField = (nodeId: string, param: ProcessParameterType) => {
         switch (param.type) {
             case "Checkbox":
+            case "Radio":
                 return (
                     <div className="mb-3">
-                        {param.options.length > 0 ? (
-                            param.options.map((option, index) => (
-                                <div key={option.id} className="d-flex mb-2 align-items-center">
+                        {(param.options || []).length > 0 ? (
+                            (param.options || []).map((optionText, index) => (
+                                <div key={`${param.id}-option-${index}`} className="d-flex mb-2 align-items-center">
                                     <div className="d-flex align-items-center flex-grow-1">
-                                        <Form.Check type="checkbox" disabled style={{ marginRight: '10px' }} />
+                                        <Form.Check 
+                                          type={param.type === "Checkbox" ? "checkbox" : "radio"} 
+                                          disabled 
+                                          style={{ marginRight: '10px' }} 
+                                          name={`param-${param.id}-group`}
+                                        />
                                         <Form.Control
                                             type="text"
-                                            value={option.text}
-                                            onChange={(e) => handleOptionChange(nodeId, param.id, option.id, e.target.value)}
+                                            value={optionText}
+                                            onChange={(e) => handleNodeParameterOptionChange(nodeId, param.id, index, e.target.value)}
                                             placeholder="Enter option"
                                         />
                                     </div>
                                     <Button
                                         variant="link"
                                         className="text-danger"
-                                        onClick={() => handleRemoveOption(nodeId, param.id, option.id)}
+                                        onClick={() => handleRemoveNodeParameterOption(nodeId, param.id, index)}
                                     >
                                         <FiTrash2 />
                                     </Button>
@@ -315,7 +315,7 @@ export default function NewProcessPage() {
                         <Button
                             variant="outline-secondary"
                             size="sm"
-                            onClick={() => handleAddOption(nodeId, param.id)}
+                            onClick={() => handleAddNodeParameterOption(nodeId, param.id)}
                             className="d-flex align-items-center"
                             style={{ borderRadius: '8px' }}
                         >
@@ -323,30 +323,30 @@ export default function NewProcessPage() {
                         </Button>
                     </div>
                 );
-            case "Radio":
+            case "Dropdown":
                 return (
                     <div className="mb-3">
-                        {param.options.length > 0 ? (
-                            param.options.map((option, index) => (
-                                <div key={option.id} className="d-flex mb-2 align-items-center">
-                                    <div className="d-flex align-items-center flex-grow-1">
-                                        <Form.Check
-                                            type="radio"
-                                            name={`radio-group-${nodeId}-${param.id}`}
-                                            disabled
-                                            style={{ marginRight: '10px' }}
-                                        />
-                                        <Form.Control
-                                            type="text"
-                                            value={option.text}
-                                            onChange={(e) => handleOptionChange(nodeId, param.id, option.id, e.target.value)}
-                                            placeholder="Enter option"
-                                        />
-                                    </div>
+                        <Form.Select disabled style={{ background: '#f8f8f8', marginBottom: '10px' }}>
+                            <option>Select an option...</option>
+                            {(param.options || []).map((optionText, index) => (
+                                <option key={`${param.id}-option-${index}`}>{optionText}</option>
+                            ))}
+                        </Form.Select>
+
+                        {(param.options || []).length > 0 ? (
+                            (param.options || []).map((optionText, index) => (
+                                <div key={`${param.id}-option-${index}-edit`} className="d-flex mb-2 align-items-center">
+                                    <Form.Control
+                                        type="text"
+                                        value={optionText}
+                                        onChange={(e) => handleNodeParameterOptionChange(nodeId, param.id, index, e.target.value)}
+                                        placeholder="Enter option"
+                                        className="flex-grow-1"
+                                    />
                                     <Button
                                         variant="link"
                                         className="text-danger"
-                                        onClick={() => handleRemoveOption(nodeId, param.id, option.id)}
+                                        onClick={() => handleRemoveNodeParameterOption(nodeId, param.id, index)}
                                     >
                                         <FiTrash2 />
                                     </Button>
@@ -358,7 +358,7 @@ export default function NewProcessPage() {
                         <Button
                             variant="outline-secondary"
                             size="sm"
-                            onClick={() => handleAddOption(nodeId, param.id)}
+                            onClick={() => handleAddNodeParameterOption(nodeId, param.id)}
                             className="d-flex align-items-center"
                             style={{ borderRadius: '8px' }}
                         >
@@ -391,49 +391,6 @@ export default function NewProcessPage() {
                         disabled
                         style={{ background: '#f8f8f8' }}
                     />
-                );
-            case "Dropdown":
-                return (
-                    <div className="mb-3">
-                        <Form.Select disabled style={{ background: '#f8f8f8', marginBottom: '10px' }}>
-                            <option>Select an option...</option>
-                            {param.options.map((option) => (
-                                <option key={option.id}>{option.text}</option>
-                            ))}
-                        </Form.Select>
-
-                        {param.options.length > 0 ? (
-                            param.options.map((option) => (
-                                <div key={option.id} className="d-flex mb-2 align-items-center">
-                                    <Form.Control
-                                        type="text"
-                                        value={option.text}
-                                        onChange={(e) => handleOptionChange(nodeId, param.id, option.id, e.target.value)}
-                                        placeholder="Enter option"
-                                        className="flex-grow-1"
-                                    />
-                                    <Button
-                                        variant="link"
-                                        className="text-danger"
-                                        onClick={() => handleRemoveOption(nodeId, param.id, option.id)}
-                                    >
-                                        <FiTrash2 />
-                                    </Button>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="text-muted mb-2">No options added. Add an option with the + button.</div>
-                        )}
-                        <Button
-                            variant="outline-secondary"
-                            size="sm"
-                            onClick={() => handleAddOption(nodeId, param.id)}
-                            className="d-flex align-items-center"
-                            style={{ borderRadius: '8px' }}
-                        >
-                            <FiPlus size="1em" className="me-1" /> Add Option
-                        </Button>
-                    </div>
                 );
             default:
                 return null;
@@ -490,7 +447,7 @@ export default function NewProcessPage() {
                         <Button
                             variant="outline-primary"
                             size="sm"
-                            onClick={() => handleAddParameter(node.id)}
+                            onClick={() => handleAddParameterToNode(node.id)}
                             style={{ borderColor: '#FEC872', color: '#14213D', borderRadius: '8px' }}
                             className="d-flex align-items-center"
                         >
@@ -498,12 +455,12 @@ export default function NewProcessPage() {
                         </Button>
                     </div>
 
-                    {node.parameters.length === 0 ? (
+                    {(node.ProcessParameter || []).length === 0 ? (
                         <div className="text-center text-muted py-4 bg-light rounded">
                             No parameters defined for this node.
                         </div>
                     ) : (
-                        node.parameters.map((param) => (
+                        (node.ProcessParameter || []).map((param) => (
                             <Card key={param.id} className="mb-3 shadow-sm">
                                 <Card.Body>
                                     <Row className="mb-3">
@@ -521,7 +478,7 @@ export default function NewProcessPage() {
                                                                 n.id === node.id
                                                                     ? {
                                                                         ...n,
-                                                                        parameters: n.parameters.map(p =>
+                                                                        ProcessParameter: (n.ProcessParameter || []).map(p =>
                                                                             p.id === param.id
                                                                                 ? {...p, name: newName}
                                                                                 : p
@@ -539,7 +496,7 @@ export default function NewProcessPage() {
                                                 <Form.Label>Type</Form.Label>
                                                 <Form.Select
                                                     value={param.type}
-                                                    onChange={(e) => updateQuestionType(param.id, e.target.value)}
+                                                    onChange={(e) => updateNodeParameterType(node.id, param.id, e.target.value)}
                                                 >
                                                     <option value="Textbox">Textbox</option>
                                                     <option value="Dropdown">Dropdown</option>
@@ -562,7 +519,7 @@ export default function NewProcessPage() {
                                                                 n.id === node.id
                                                                     ? {
                                                                         ...n,
-                                                                        parameters: n.parameters.map(p =>
+                                                                        ProcessParameter: (n.ProcessParameter || []).map(p =>
                                                                             p.id === param.id
                                                                                 ? {...p, mandatory: !p.mandatory}
                                                                                 : p
@@ -579,7 +536,7 @@ export default function NewProcessPage() {
                                             <Button
                                                 variant="outline-danger"
                                                 size="sm"
-                                                onClick={() => handleRemoveParameter(param.id)}
+                                                onClick={() => handleRemoveParameterFromNode(node.id, param.id)}
                                             >
                                                 <FiTrash2 />
                                             </Button>
@@ -626,8 +583,8 @@ export default function NewProcessPage() {
                         </Button>
                     </div>
                 ) : (
-                    processParameters.map((param, index) => (
-                        <Card key={index} className="mb-3 shadow-sm" style={{ borderLeft: '3px solid #FEC872' }}>
+                    processParameters.map((param) => (
+                        <Card key={param.id} className="mb-3 shadow-sm" style={{ borderLeft: '3px solid #FEC872' }}>
                             <Card.Body>
                                 <Row className="mb-3">
                                     <Col md={6}>
@@ -636,7 +593,7 @@ export default function NewProcessPage() {
                                             <Form.Control
                                                 type="text"
                                                 value={param.name}
-                                                onChange={(e) => handleProcessParameterChange(index, 'name', e.target.value)}
+                                                onChange={(e) => handleProcessParameterChange(param.id, 'name', e.target.value)}
                                                 placeholder="Enter parameter name"
                                             />
                                         </Form.Group>
@@ -646,7 +603,7 @@ export default function NewProcessPage() {
                                             <Form.Label>Type</Form.Label>
                                             <Form.Select
                                                 value={param.type}
-                                                onChange={(e) => handleProcessParameterChange(index, 'type', e.target.value)}
+                                                onChange={(e) => handleProcessParameterChange(param.id, 'type', e.target.value)}
                                             >
                                                 <option value="Textbox">Textbox</option>
                                                 <option value="Dropdown">Dropdown</option>
@@ -663,7 +620,7 @@ export default function NewProcessPage() {
                                                 type="checkbox"
                                                 label="Required"
                                                 checked={param.mandatory}
-                                                onChange={(e) => handleProcessParameterChange(index, 'mandatory', e.target.checked)}
+                                                onChange={(e) => handleProcessParameterChange(param.id, 'mandatory', e.target.checked)}
                                             />
                                         </Form.Group>
                                     </Col>
@@ -671,7 +628,7 @@ export default function NewProcessPage() {
                                         <Button
                                             variant="outline-danger"
                                             size="sm"
-                                            onClick={() => handleRemoveProcessParameter(index)}
+                                            onClick={() => handleRemoveProcessParameter(param.id)}
                                         >
                                             <FiTrash2 />
                                         </Button>
@@ -681,13 +638,13 @@ export default function NewProcessPage() {
                                 {(param.type === 'Dropdown' || param.type === 'Checkbox' || param.type === 'Radio') && (
                                     <div className="mt-3">
                                         <Form.Label>Options</Form.Label>
-                                        {param.options.map((option, optIndex) => (
-                                            <Row key={optIndex} className="mb-2">
+                                        {(param.options || []).map((option, optIndex) => (
+                                            <Row key={`${param.id}-option-${optIndex}`} className="mb-2">
                                                 <Col md={10}>
                                                     <Form.Control
                                                         type="text"
                                                         value={option}
-                                                        onChange={(e) => handleProcessParameterOptionChange(index, optIndex, e.target.value)}
+                                                        onChange={(e) => handleProcessParameterOptionChange(param.id, optIndex, e.target.value)}
                                                         placeholder={`Option ${optIndex + 1}`}
                                                     />
                                                 </Col>
@@ -695,7 +652,7 @@ export default function NewProcessPage() {
                                                     <Button
                                                         variant="outline-danger"
                                                         size="sm"
-                                                        onClick={() => handleRemoveProcessParameterOption(index, optIndex)}
+                                                        onClick={() => handleRemoveProcessParameterOption(param.id, optIndex)}
                                                     >
                                                         <FiTrash2 />
                                                     </Button>
@@ -705,7 +662,7 @@ export default function NewProcessPage() {
                                         <Button
                                             variant="outline-secondary"
                                             size="sm"
-                                            onClick={() => handleAddProcessParameterOption(index)}
+                                            onClick={() => handleAddProcessParameterOption(param.id)}
                                             className="mt-2 d-flex align-items-center"
                                             style={{ borderRadius: '8px' }}
                                         >
@@ -732,19 +689,11 @@ export default function NewProcessPage() {
                 }
             >
                 <Form.Label><FiInfo/></Form.Label>
-
             </OverlayTrigger>
         )
     }
 
-    // save new process
     const handleValidations = () => {
-        // validations:
-        // check that process name doesnt match any within same playbook.
-        // check all nodes have names
-        // check all node and process parameters have names
-        // check all params have at least 1 option.
-            // check all options have names.
         setError(null)
         if (!processName.trim()){
             setError("Process name cannot be empty");
@@ -766,7 +715,7 @@ export default function NewProcessPage() {
                     return false;
                 }
 
-                for (const param of node.parameters) {
+                for (const param of (node.ProcessParameter || [])) {
                     if (!param.name.trim()) {
                         setError(`Empty parameter in "${node.name}"`);
                         setActiveTab('nodes');
@@ -774,14 +723,14 @@ export default function NewProcessPage() {
                     }
 
                     if (param.type === 'Checkbox' || param.type === 'Radio' || param.type === 'Dropdown') {
-                        if (!param.options.length) {
+                        if (!(param.options && param.options.length)) {
                             setError(`Parameter "${param.name}" of node "${node.name}" must have at least 1 option`)
                             setActiveTab('nodes');
                             return false;
                         }
                         else {
                             for (const option of param.options) {
-                                if (!option.text.trim()) {
+                                if (!option.trim()) {
                                     setError(`Option in parameter "${param.name}" of node "${node.name}" must have a name.`);
                                     setActiveTab('nodes');
                                     return false;
@@ -789,11 +738,8 @@ export default function NewProcessPage() {
                             }
                         }
                     }
-
-
                 }
             }
-            console.log('All nodes ok.')
         }
 
         if (processParameters.length > 0){
@@ -806,68 +752,48 @@ export default function NewProcessPage() {
             }
         }
 
-        // console.log('All ok.')
         return true;
     }
 
     const handleSave = async () => {
-
         if (!handleValidations()) return;
 
         setIsSubmitting(true);
         setError(null);
 
         try {
-            const endpoint = `/api/process`;
-            // Transform node parameters and options for API
-            const transformedNodes = nodeList.map(node => ({
+            const transformedNodesForPayload = nodeList.map(node => ({
                 name: node.name,
                 type: node.type,
-                parameters: node.parameters.map(param => ({
+                shortDescription: node.shortDescription || undefined,
+                parameters: (node.ProcessParameter || []).map(param => ({
                     name: param.name,
                     type: param.type,
                     mandatory: param.mandatory,
-                    options: param.options.map(opt => opt.text)
+                    options: param.options || [],
                 }))
             }));
 
-
-            // Format process parameters for API
-            const formattedProcessParams = processParameters.map(param => ({
+            const formattedProcessParamsForPayload = processParameters.map(param => ({
                 name: param.name,
                 type: param.type,
                 mandatory: param.mandatory,
-                options: param.options
+                options: param.options || []
             }));
 
-            const payload = {
-                playbookId: playbookId,
-                // processId: existingProcessId,
+            const payload: CreateProcessPayload = {
+                playbookId: playbookId!,
                 processName: processName,
                 shortDescription: processDescription || undefined,
-                nodeList: transformedNodes,
-                processParameters: formattedProcessParams,
+                nodeList: transformedNodesForPayload,
+                processParameters: formattedProcessParamsForPayload,
                 processDependency: fromProcess ? {
                     parentProcessId: fromProcess.id,
-                    // playbookId: playbookId,
                     trigger: 'PENDING',
-                } : null
-
+                } : undefined
             };
 
-            const response = await fetch(endpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                console.log(response)
-                throw new Error("[New Process Page] Failed to save process");
-            }
-
-            // const savedData = await response.json();
-
+            const savedData = await ProcessAPI.create(payload);
 
             setIsSubmitting(false);
             setSuccessMessage('Process created successfully. Redirecting...');
@@ -878,13 +804,11 @@ export default function NewProcessPage() {
             setError("Failed to save process. Please try again.");
             setIsSubmitting(false)
         }
-
     }
 
     if (isLoading) {
         return (
             <div>
-                {/* <NavBar /> */}
                 <Container className="py-5">
                     <div className="d-flex justify-content-center">
                         <Spinner animation="border" role="status">
@@ -899,7 +823,6 @@ export default function NewProcessPage() {
     return (
         <div>
             <Container className="py-4">
-                {/* header */}
                 <div className="mb-4">
                     <h1 className="mt-2" style={{ color: '#14213D' }}>
                         Create a New Process
@@ -918,7 +841,6 @@ export default function NewProcessPage() {
                     </Alert>
                 )}
 
-                {/* Enter Process name and description  */}
                 <Card className="mb-4">
                     <Card.Body>
                         <Form.Group className="mb-3">
@@ -942,7 +864,6 @@ export default function NewProcessPage() {
                             />
                         </Form.Group>
 
-                        {/* Process dependencies. */}
                         <Row>
                             <Col md={6}>
                                 <Form.Group className="mb-3">
@@ -969,24 +890,11 @@ export default function NewProcessPage() {
                                     </Form.Select>
                                 </Form.Group>
                             </Col>
-                            {/* <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Next Process</Form.Label>
-                                    <Form.Select>
-                                        <option value="">No next Process</option>
-                                        <option value="active">Active</option>
-                                        <option value="inactive">Inactive</option>
-                                        <option value="archived">Archived</option>
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col> */}
                         </Row>
                     </Card.Body>
                 </Card>
 
-                {/* Content */}
                 <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k || 'nodes')} className="mb-4">
-                    {/* Nodes tab */}
                     <Tab eventKey="nodes" title="Nodes">
                         <div className="d-flex justify-content-between mb-3">
                             <h5>Process Nodes</h5>
@@ -1000,7 +908,6 @@ export default function NewProcessPage() {
                             </Button>
                         </div>
 
-                        {/* Display all nodes. */}
                         {nodeList.map((node) => renderNodeBox(node))}
                         {nodeList.length === 0 && (
                             <div className="text-center py-5 bg-light rounded">
@@ -1015,16 +922,13 @@ export default function NewProcessPage() {
                                 </Button>
                             </div>
                         )}
-
                     </Tab>
 
-                    {/* Process parameters tab */}
                     <Tab eventKey="parameters" title="Process Parameters">
                         {renderProcessParameters()}
                     </Tab>
                 </Tabs>
 
-                {/* Save and cancel buttons */}
                 <div className="mt-4 d-flex justify-content-between">
                     <Button
                         onClick={() => router.replace(returnEndpoint)}

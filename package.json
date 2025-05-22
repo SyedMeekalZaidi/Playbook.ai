@@ -13,8 +13,11 @@
     "create-logo": "node scripts/createPlaceholderLogo.js"
   },
   "dependencies": {
+    "@lexical/code": "^0.31.2",
+    "@lexical/react": "^0.31.2",
     "@prisma/client": "^6.5.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.4",
     "bcrypt": "^5.1.1",
     "bootstrap": "^5.3.3",

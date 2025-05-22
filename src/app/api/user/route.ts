@@ -1,36 +1,60 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { handleApiError } from '@/lib/api-utils';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // must be service role key
-);
+let supabase: SupabaseClient;
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl) {
+  console.error("ERROR: NEXT_PUBLIC_SUPABASE_URL environment variable is not set.");
+}
+if (!supabaseServiceRoleKey) {
+  console.error("ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is not set. This is required for admin operations.");
+}
+
+if (supabaseUrl && supabaseServiceRoleKey) {
+  supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    }
+  });
+}
 
 export async function GET(req: Request) {
+  if (!supabaseUrl || !supabaseServiceRoleKey || !supabase) {
+    return NextResponse.json(
+      { error: "Supabase client is not configured. Check server logs for missing environment variables (NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY)." },
+      { status: 500 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const email = searchParams.get('email');
 
   if (!email) {
-    return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    return NextResponse.json({ error: 'Email query parameter is required' }, { status: 400 });
   }
 
   try {
-    const { data, error } = await supabase.auth.admin.listUsers();
+    const { data, error: listUsersError } = await supabase.auth.admin.listUsers();
 
-    if (error || !data) {
-      console.error('Supabase listUsers error:', error);
-      return NextResponse.json({ error: 'Failed to list users from authentication provider', supabaseError: error?.message }, { status: 500 });
+    if (listUsersError) {
+      console.error('Supabase admin API error (listUsers):', listUsersError);
+      return handleApiError(listUsersError, `Error fetching users from Supabase: ${listUsersError.message}`);
     }
 
-    const match = data.users.find((user) => user.email === email);
+    const user = data.users.find((u: any) => u.email === email);
 
-    if (!match) {
+    if (user) {
+      return NextResponse.json({ id: user.id, email: user.email }, { status: 200 });
+    } else {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
-    return NextResponse.json({ id: match.id }, { status: 200 });
-  } catch (err) {
-    return handleApiError(err, "Unexpected error in user route");
+  } catch (error: any) {
+    console.error('Catch-all error in /api/user GET:', error);
+    return handleApiError(error, 'Failed to retrieve user data due to an unexpected error.');
   }
 }

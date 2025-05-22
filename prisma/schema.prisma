@@ -7,6 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Audit trail of every minor change
 model ChangeLog {
   id         String   @id
   playbookId String
@@ -14,6 +15,16 @@ model ChangeLog {
   action     String
   details    String?
   timestamp  DateTime @default(now())
+  Playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+}
+
+// A snapshot of the playbook that can be reverted back to
+model VersionHistory {
+  id         String   @id
+  playbookId String
+  version    Int
+  data       Json
+  createdAt  DateTime @default(now())
   Playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 }
 
@@ -68,6 +79,9 @@ model Playbook {
   documentContent      Json?
   shortDescription     String?                @db.VarChar(280)
   status               Status                 @default(PLANNING)
+  sourcePlaybookId     String?                // ID of the playbook this was copied from
+  sourcePlaybook       Playbook?              @relation("PlaybookCopies", fields: [sourcePlaybookId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  copiedToPlaybooks    Playbook[]             @relation("PlaybookCopies") // List of playbooks that are copies of this one
   ChangeLog            ChangeLog[]
   CollaborationSession CollaborationSession[]
   DocumentImage        DocumentImage[]
@@ -75,6 +89,8 @@ model Playbook {
   PlaybookCollaborator PlaybookCollaborator[]
   Process              Process[]
   VersionHistory       VersionHistory[]
+  PlaybookShareLogOriginal PlaybookShareLog[] @relation("OriginalPlaybookShares")
+  PlaybookShareLogCopied   PlaybookShareLog[] @relation("CopiedPlaybookShares")
 }
 
 model PlaybookCollaborator {
@@ -131,15 +147,6 @@ model ProcessParameter {
   Process   Process? @relation(fields: [processId], references: [id], onDelete: Cascade)
 }
 
-model VersionHistory {
-  id         String   @id
-  playbookId String
-  version    Int
-  data       Json
-  createdAt  DateTime @default(now())
-  Playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-}
-
 model Event {
   id               String   @id @default(uuid())
   name             String
@@ -153,9 +160,24 @@ model Event {
   Playbook         Playbook @relation(fields: [playbookId], references: [id])
 }
 
+model PlaybookShareLog {
+  id                 String   @id @default(uuid())
+  originalPlaybookId String
+  copiedPlaybookId   String   @unique // Each copy event results in one unique copied playbook
+  sharedByUserId     String   // User ID of the person who initiated the share
+  sharedWithUserId   String   // User ID of the person who received the copy (new owner)
+  sharedAt           DateTime @default(now())
+
+  originalPlaybook Playbook @relation("OriginalPlaybookShares", fields: [originalPlaybookId], references: [id], onDelete: Cascade)
+  copiedPlaybook   Playbook @relation("CopiedPlaybookShares", fields: [copiedPlaybookId], references: [id], onDelete: Cascade)
+
+  @@index([originalPlaybookId])
+  @@index([sharedByUserId])
+  @@index([sharedWithUserId])
+}
+
 enum Role {
   ADMIN
-  PLAYBOOK_CREATOR
   COLLABORATOR
 }
 

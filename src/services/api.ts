@@ -5,8 +5,14 @@ import {
     CreateNodePayload, UpdateNodePayload,
     CreateProcessParameterPayload, UpdateProcessParameterPayload,
     CreateProcessDependencyPayload,
-    Event as EventType // Assuming Event type is defined in @/types/api
+    Event as EventType, // Assuming Event type is defined in @/types/api
+    Playbook,
+    ShareRequestBody,
+    ShareAdvancedResponse,
+    GetPlaybookByIdOptions
 } from '@/types/api';
+
+const API_BASE_URL = '/api';
 
 // Helper function for API calls
 const apiCall = async (url: string, options = {}) => {
@@ -25,6 +31,19 @@ const apiCall = async (url: string, options = {}) => {
   return response.json();
 };
 
+async function handleApiResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let errorData;
+    try {
+      errorData = await response.json();
+    } catch (e) {
+      errorData = { message: response.statusText || `HTTP error! status: ${response.status}` };
+    }
+    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
 // Playbook API operations
 export const PlaybookAPI = {
   getAll: (params?: { ownerId?: string; status?: string }) => {
@@ -39,19 +58,19 @@ export const PlaybookAPI = {
     }
     return apiCall(url);
   },
-  getById: (id: string, params?: { includeProcess?: boolean; includeNodes?: boolean; includeNodeParams?: boolean; includeAll?: boolean }) => {
-    let url = `/api/playbooks/${id}`;
-    if (params) {
+  async getById(playbookId: string, options?: GetPlaybookByIdOptions): Promise<Playbook> {
+    let url = `${API_BASE_URL}/playbooks/${playbookId}`;
+    if (options) {
       const queryParams = new URLSearchParams();
-      if (params.includeProcess) queryParams.append('includeProcess', 'true');
-      if (params.includeNodes) queryParams.append('includeNodes', 'true');
-      if (params.includeNodeParams) queryParams.append('includeNodeParams', 'true');
-      if (params.includeAll) queryParams.append('includeAll', 'true');
+      if (options.includeProcess) queryParams.append('includeProcess', 'true');
+      if (options.includeNodes) queryParams.append('includeNodes', 'true');
+      if (options.includeNodeParams) queryParams.append('includeNodeParams', 'true');
       if (queryParams.toString()) {
         url += `?${queryParams.toString()}`;
       }
     }
-    return apiCall(url);
+    const response = await fetch(url);
+    return handleApiResponse<Playbook>(response);
   },
   create: (data: CreatePlaybookPayload) => apiCall('/api/playbooks', {
     method: 'POST',
@@ -72,6 +91,16 @@ export const PlaybookAPI = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  async shareAdvanced(playbookId: string, payload: ShareRequestBody): Promise<ShareAdvancedResponse> {
+    const response = await fetch(`${API_BASE_URL}/playbooks/${playbookId}/share`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return handleApiResponse<ShareAdvancedResponse>(response);
+  },
 };
 
 // Process API operations
@@ -129,17 +158,37 @@ export const ProcessAPI = {
 
 // Node API operations
 export const NodeAPI = {
+  // Get all nodes for a specific process, including their parameters
   getByProcess: (processId: string) => apiCall(`/api/processes/${processId}/nodes`),
-  getById: (id: string) => apiCall(`/api/nodes/${id}`),
-  create: (data: CreateNodePayload) => apiCall('/api/nodes', {
+  
+  // Get all nodes, optionally filtered by processId, or a single node by id
+  getAll: (params?: { processId?: string }) => {
+    let url = '/api/node';
+    if (params?.processId) {
+      const queryParams = new URLSearchParams();
+      queryParams.append('processId', params.processId);
+      url += `?${queryParams.toString()}`;
+    }
+    return apiCall(url);
+  },
+  
+  // Get a specific node by its ID
+  getById: (id: string) => apiCall(`/api/node?id=${id}`),
+  
+  // Create a new node
+  create: (data: CreateNodePayload) => apiCall('/api/node', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  update: (id: string, data: UpdateNodePayload) => apiCall(`/api/nodes/${id}`, {
+  
+  // Update an existing node (PATCH /api/node, body includes id)
+  update: (data: UpdateNodePayload) => apiCall('/api/node', {
     method: 'PATCH',
-    body: JSON.stringify(data),
+    body: JSON.stringify(data), // data includes the id of the node
   }),
-  delete: (id: string) => apiCall(`/api/nodes/${id}`, {
+  
+  // Delete a node by its ID
+  delete: (id: string) => apiCall(`/api/node?id=${id}`, {
     method: 'DELETE',
   }),
 };

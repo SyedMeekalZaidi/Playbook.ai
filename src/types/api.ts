@@ -1,7 +1,10 @@
-import { Status as PrismaStatus, Role as PrismaRole } from '@prisma/client';
+import { Status as PrismaStatus, Role as PrismaClientRole } from '@prisma/client';
 
 export type Status = PrismaStatus;
-export type PlaybookCollaboratorRole = PrismaRole;
+export type PlaybookCollaboratorRole = PrismaClientRole;
+
+// Export the Role enum so it can be imported by other modules
+export { PrismaClientRole as Role };
 
 export interface User {
   id: string;
@@ -23,6 +26,7 @@ export interface Playbook {
   Process?: Process[]; // Optional: for eager loading
   PlaybookCollaborator?: PlaybookCollaborator[]; // Optional: for eager loading
   // Add other fields from your Prisma schema if needed
+  Role?: PrismaClientRole; // Added to satisfy potential type usage, though not directly on playbook model
 }
 
 export interface Process {
@@ -48,6 +52,7 @@ export interface Node {
   shortDescription?: string | null;
   processId: string;
   bpmnId?: string | null; // For BPMN modeler
+  documentContent?: any | null; // Prisma Json type, added
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
   ProcessParameter?: ProcessParameter[]; // Node-specific parameters
@@ -81,7 +86,7 @@ export interface PlaybookCollaborator {
   id: string;
   playbookId: string;
   userId: string; // Supabase User ID as a String
-  role: PlaybookCollaboratorRole;
+  role: PlaybookCollaboratorRole; // Uses the type defined above
   createdAt: string; // ISO date string
   Playbook?: Playbook; // Optional: for eager loading
   // User?: User; // Optional: if you want to include user details
@@ -138,18 +143,21 @@ export type UpdateProcessPatchPayload = Partial<UpdateProcessPutPayload>;
 export interface CreateNodePayload {
   name: string;
   type: string;
-  processId: string;
+  processId: string; // processId is part of the body for POST /api/node
   shortDescription?: string | null;
   bpmnId?: string | null;
-  parameters?: CreateProcessParameterPayload[]; // For node-specific parameters
+  documentContent?: any | null;
+  // parameters?: CreateProcessParameterPayload[]; // Removed: POST /api/node doesn't create parameters inline
 }
 
-export interface UpdateNodePayload { // For PATCH /api/nodes/[nodeId]
+export interface UpdateNodePayload { // For PATCH /api/node (body includes id)
+  id: string; // ID of the node to update
   name?: string;
   type?: string;
   shortDescription?: string | null;
   bpmnId?: string | null;
-  // parameters?: UpdateProcessParameterPayload[]; // If updating parameters inline
+  documentContent?: any | null;
+  // parameters?: UpdateProcessParameterPayload[]; // Removed: Parameters are managed via process or specific parameter endpoints
 }
 
 
