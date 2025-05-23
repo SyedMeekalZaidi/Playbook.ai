@@ -31,57 +31,93 @@ export default function Signup() {
   );
 
   const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setStatusMessage({ type: 'info', message: 'Creating your account...' });
+  e.preventDefault();
+  setIsLoading(true);
+  setStatusMessage({ type: 'info', message: 'Creating your account...' });
 
-    // Form validation
-    if (password !== confirmPassword) {
-      setStatusMessage({ type: 'error', message: 'Passwords do not match' });
-      setIsLoading(false);
-      return;
-    }
+  // White-Box Test 1: Password Validation Logic
+  if (password !== confirmPassword) {
+    console.log('White-Box Test 1 - Password Mismatch:', {
+      password,
+      confirmPassword,
+      result: 'Failed - Passwords do not match',
+    });
+    setStatusMessage({ type: 'error', message: 'Passwords do not match' });
+    setIsLoading(false);
+    return;
+  } else {
+    console.log('White-Box Test 1 - Password Mismatch:', {
+      password,
+      confirmPassword,
+      result: 'Passed - Passwords match',
+    });
+  }
 
-    if (password.length < 8) {
-      setStatusMessage({ type: 'error', message: 'Password must be at least 8 characters long' });
-      setIsLoading(false);
-      return;
-    }
+  if (password.length < 8) {
+    console.log('White-Box Test 1 - Password Length:', {
+      password,
+      length: password.length,
+      result: 'Failed - Password too short',
+    });
+    setStatusMessage({ type: 'error', message: 'Password must be at least 8 characters long' });
+    setIsLoading(false);
+    return;
+  } else {
+    console.log('White-Box Test 1 - Password Length:', {
+      password,
+      length: password.length,
+      result: 'Passed - Password length sufficient',
+    });
+  }
 
-    try {
-      // Register user with Supabase Auth - include role in metadata
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
+  try {
+    // White-Box Test 2: Supabase Authentication Logic
+    console.log('White-Box Test 2 - Supabase Call Initiated:', { email });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password
+    });
+
+    if (error) {
+      console.log('White-Box Test 2 - Supabase Error:', {
+        errorMessage: error.message,
+        result: 'Failed - Supabase signup error',
       });
-
-      if (error) {
-        setStatusMessage({
-          type: 'error',
-          message: error.message || 'Failed to sign up'
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      if (data?.user) {
-        setStatusMessage({
-          type: 'success',
-          message: 'Account created successfully! Please check your inbox for a confirmation email before logging in.'
-        });
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 4000);
-      }
-    } catch (error: any) {
       setStatusMessage({
         type: 'error',
-        message: error.message || 'An unexpected error occurred'
+        message: error.message || 'Failed to sign up',
       });
-    } finally {
       setIsLoading(false);
+      return;
     }
-  };
+
+    if (data?.user) {
+      console.log('White-Box Test 2 - Supabase Success:', {
+        userId: data.user.id,
+        email: data.user.email,
+        result: 'Passed - User created successfully',
+      });
+      setStatusMessage({
+        type: 'success',
+        message: 'Account created successfully! Redirecting to login...',
+      });
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 2000);
+    }
+  } catch (error: any) {
+    console.log('White-Box Test 2 - Unexpected Error:', {
+      errorMessage: error.message,
+      result: 'Failed - Unexpected error during signup',
+    });
+    setStatusMessage({
+      type: 'error',
+      message: error.message || 'An unexpected error occurred',
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);
