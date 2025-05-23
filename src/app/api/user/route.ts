@@ -1,35 +1,17 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { handleApiError } from '@/lib/api-utils';
-
-let supabase: SupabaseClient;
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl) {
-  console.error("ERROR: NEXT_PUBLIC_SUPABASE_URL environment variable is not set.");
-}
-if (!supabaseServiceRoleKey) {
-  console.error("ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is not set. This is required for admin operations.");
-}
-
-if (supabaseUrl && supabaseServiceRoleKey) {
-  supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    }
-  });
-}
+import { createAdminClient } from '@/utils/supabase/server'; // Using admin client for listUsers
 
 export async function GET(req: Request) {
-  if (!supabaseUrl || !supabaseServiceRoleKey || !supabase) {
+  // Ensure SUPABASE_SERVICE_ROLE_KEY is set in your .env.local for createAdminClient to work
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("API User Route: SUPABASE_SERVICE_ROLE_KEY not set for admin client.");
     return NextResponse.json(
-      { error: "Supabase client is not configured. Check server logs for missing environment variables (NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY)." },
+      { error: "Supabase admin client is not configured on the server. Check server logs." },
       { status: 500 }
     );
   }
+  const supabase = createAdminClient();
 
   const { searchParams } = new URL(req.url);
   const email = searchParams.get('email');
@@ -39,7 +21,11 @@ export async function GET(req: Request) {
   }
 
   try {
-    const { data, error: listUsersError } = await supabase.auth.admin.listUsers();
+    // Fetch all users. Consider pagination if you have a very large number of users.
+    // Default perPage is 50 for listUsers.
+    const { data, error: listUsersError } = await supabase.auth.admin.listUsers({
+      // perPage: 1000 // Example: Increase if needed, max is typically 1000 for some Supabase plans
+    });
 
     if (listUsersError) {
       console.error('Supabase admin API error (listUsers):', listUsersError);

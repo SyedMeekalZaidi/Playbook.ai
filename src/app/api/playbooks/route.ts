@@ -3,12 +3,13 @@ import { prisma, withRetry } from '@/lib/prisma'; // Assuming withRetry is in li
 import { handleApiError } from '@/lib/api-utils';
 import { Status } from '@prisma/client';
 
-// GET all playbooks, optionally filtered by ownerId or status
+// GET all playbooks, optionally filtered by ownerId, status, or isCopy
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const ownerId = searchParams.get('ownerId');
     const statusParam = searchParams.get('status');
+    const isCopyParam = searchParams.get('isCopy');
 
     let whereClause: any = { isDeleted: false };
 
@@ -24,6 +25,15 @@ export async function GET(req: Request) {
       }
     }
     
+    // If isCopy is 'false', we only want original playbooks (sourcePlaybookId is null)
+    // If isCopy is 'true', we want copies (sourcePlaybookId is not null) - handled by /implementations route
+    // If isCopy is not provided, we don't filter by sourcePlaybookId (gets all for owner)
+    if (isCopyParam === 'false') {
+      whereClause.sourcePlaybookId = null;
+    } else if (isCopyParam === 'true') {
+      whereClause.sourcePlaybookId = { not: null };
+    }
+
     // Defensive check: ensure Prisma is initialized
     if (!prisma || !prisma.playbook) {
       return handleApiError(new Error("Prisma client or playbook model not available."), "Server misconfiguration.");

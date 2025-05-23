@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { handleApiError } from '@/lib/api-utils';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/utils/supabase/server';
 import { Role } from '@prisma/client';
 
 interface UserDetails {
@@ -26,22 +26,6 @@ interface SharingDetailsResponse {
     implementors: ImplementorDetails[];
 }
 
-let supabaseAdmin: SupabaseClient;
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (supabaseUrl && supabaseServiceRoleKey) {
-  supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    }
-  });
-} else {
-  console.error("Sharing Details API: Supabase admin client not configured. Check NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
-}
-
 const generateThumbnail = (email?: string | null): string => {
     if (email && typeof email === 'string' && email.length > 0) {
         return email.charAt(0).toUpperCase();
@@ -51,8 +35,11 @@ const generateThumbnail = (email?: string | null): string => {
 
 export async function GET(req: Request, { params }: { params: { playbookId: string } }) {
   const { playbookId } = params;
+  const supabaseAdmin = await createAdminClient();
 
-  if (!supabaseAdmin) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    // This check might be redundant if createAdminClient handles it, but good for clarity
+    console.error("Sharing Details API: Supabase environment variables not set.");
     return NextResponse.json(
       { error: "Supabase admin client is not configured on the server." },
       { status: 500 }

@@ -5,8 +5,9 @@ import {
     CreateNodePayload, UpdateNodePayload,
     CreateProcessParameterPayload, UpdateProcessParameterPayload,
     CreateProcessDependencyPayload,
-    Event as EventType, // Assuming Event type is defined in @/types/api
+    Event as EventType, 
     Playbook,
+    ImplementorPlaybook, // Import ImplementorPlaybook
     ShareRequestBody,
     ShareAdvancedResponse,
     GetPlaybookByIdOptions
@@ -14,13 +15,15 @@ import {
 
 const API_BASE_URL = '/api';
 
-// Helper function for API calls
-const apiCall = async (url: string, options = {}) => {
+// Helper function for API calls - now generic
+const apiCall = async <T = any>(url: string, options: RequestInit = {}): Promise<T> => {
   const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
+      ...options.headers, 
     },
-    ...options,
+    credentials: 'include', 
+    ...options, 
   });
 
   if (!response.ok) {
@@ -28,7 +31,7 @@ const apiCall = async (url: string, options = {}) => {
     throw new Error(error.error || `API error: ${response.status}`);
   }
 
-  return response.json();
+  return response.json() as Promise<T>; // Cast to Promise<T>
 };
 
 async function handleApiResponse<T>(response: Response): Promise<T> {
@@ -46,17 +49,19 @@ async function handleApiResponse<T>(response: Response): Promise<T> {
 
 // Playbook API operations
 export const PlaybookAPI = {
-  getAll: (params?: { ownerId?: string; status?: string }) => {
+  getAll: (params?: { ownerId?: string; status?: string; isCopy?: boolean }): Promise<Playbook[]> => {
     let url = '/api/playbooks';
     if (params) {
       const queryParams = new URLSearchParams();
       if (params.ownerId) queryParams.append('ownerId', params.ownerId);
       if (params.status) queryParams.append('status', params.status);
+      // Add isCopy to distinguish original playbooks from implementations for "My Playbooks"
+      if (params.isCopy !== undefined) queryParams.append('isCopy', String(params.isCopy));
       if (queryParams.toString()) {
         url += `?${queryParams.toString()}`;
       }
     }
-    return apiCall(url);
+    return apiCall<Playbook[]>(url); // Use generic apiCall
   },
   async getById(playbookId: string, options?: GetPlaybookByIdOptions): Promise<Playbook> {
     let url = `${API_BASE_URL}/playbooks/${playbookId}`;
@@ -72,22 +77,22 @@ export const PlaybookAPI = {
     const response = await fetch(url);
     return handleApiResponse<Playbook>(response);
   },
-  create: (data: CreatePlaybookPayload) => apiCall('/api/playbooks', {
+  create: (data: CreatePlaybookPayload): Promise<Playbook> => apiCall<Playbook>('/api/playbooks', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  put: (id: string, data: UpdatePlaybookPutPayload) => apiCall(`/api/playbooks/${id}`, {
+  put: (id: string, data: UpdatePlaybookPutPayload): Promise<Playbook> => apiCall<Playbook>(`/api/playbooks/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
-  patch: (id: string, data: UpdatePlaybookPatchPayload) => apiCall(`/api/playbooks/${id}`, {
+  patch: (id: string, data: UpdatePlaybookPatchPayload): Promise<Playbook> => apiCall<Playbook>(`/api/playbooks/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   }),
-  delete: (id: string) => apiCall(`/api/playbooks/${id}`, {
+  delete: (id: string): Promise<any> => apiCall(`/api/playbooks/${id}`, { // Adjust return type if known
     method: 'DELETE',
   }),
-  share: (playbookId: string, data: SharePlaybookPayload) => apiCall(`/api/playbooks/${playbookId}/share`, {
+  share: (playbookId: string, data: SharePlaybookPayload): Promise<any> => apiCall(`/api/playbooks/${playbookId}/share`, { // Adjust return type if known
     method: 'POST',
     body: JSON.stringify(data),
   }),
@@ -98,8 +103,15 @@ export const PlaybookAPI = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
+      credentials: 'include', 
     });
     return handleApiResponse<ShareAdvancedResponse>(response);
+  },
+  getCollaborationPlaybooks: (): Promise<Playbook[]> => {
+    return apiCall<Playbook[]>(`${API_BASE_URL}/playbooks/collaborations`);
+  },
+  getImplementorPlaybooks: (): Promise<ImplementorPlaybook[]> => {
+    return apiCall<ImplementorPlaybook[]>(`${API_BASE_URL}/playbooks/implementations`);
   },
 };
 

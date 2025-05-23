@@ -1,12 +1,10 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { handleApiError } from '@/lib/api-utils'; // Assuming lib is at src/lib
+import { handleApiError } from '@/lib/api-utils';
+import { createApiClient } from '@/utils/supabase/server';
 
 export async function GET(req: Request) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = await createApiClient();
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
 

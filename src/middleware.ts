@@ -1,92 +1,97 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
+import { type NextRequest, NextResponse } from 'next/server'
+import { updateSession } from '@/utils/supabase/middleware' // Ensure this path is correct
+import { createServerClient, type CookieOptions } from '@supabase/ssr' // Added import
 
-// Routes that don't require authentication
-const publicRoutes = ['/login', '/signup', '/', '/about'];
-
-// Routes that should bypass authentication checks (assets, api routes, etc.)
-const excludedPaths = [
-  '/api/',
-  '/_next/',
-  '/favicon.ico',
-  '/rose-logo.svg',
-  '/static/',
-  '/images/',
+// Routes that are public and don't need any session state or redirection logic in middleware
+const PUBLIC_STATIC_ASSET_PATTERNS = [
+  /\.(?:svg|png|jpg|jpeg|gif|webp)$/, // Common image formats
+  /^\/fonts\//, // Font files
+  /^\/images\//, // Your public images folder
+  /^\/static\//, // Your public static folder
+  /^\/manifest\.json$/,
+  /^\/robots\.txt$/,
+  /^\/favicon\.ico$/,
 ];
 
-export async function middleware(req: NextRequest) {
-  // Create a response object
-  const res = NextResponse.next();
-  
-  // Get the pathname
-  const path = req.nextUrl.pathname;
-  
-  // Log the URL for debugging
-  console.log(`[Middleware] Processing URL: ${req.url}`);
-  
-  // Skip excluded paths
-  const isExcludedPath = excludedPaths.some(excludedPath => path.startsWith(excludedPath));
-  if (isExcludedPath) {
-    console.log(`[Middleware] Excluded path: ${path}`);
-    return res;
-  }
-  
-  // Check if this is a public route
-  const isPublicRoute = publicRoutes.includes(path);
-  if (isPublicRoute) {
-    console.log(`[Middleware] Public route: ${path}, skipping auth check`);
-    return res;
-  }
-  
-  // Initialize Supabase client with appropriate options
-  const supabase = createMiddlewareClient({ req, res });
-  
-  try {
-    // Check if we have a session
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    console.log(`[Middleware] Auth check for ${path}: Session exists: ${!!session}`);
+const PUBLIC_API_ROUTES = [
+  '/api/auth/callback', // Supabase auth callback
+  // Add other specific public API routes if any
+];
 
-    // If we don't have a session and this isn't a public route, redirect to login
-    if (!session) {
-      console.log(`[Middleware] No session for protected route ${path}, redirecting to login`);
-      
-      // Check if this request already comes from a redirect attempt to prevent loops
-      const referer = req.headers.get('referer') || '';
-      const isFromLogin = referer.includes('/login');
-      
-      // If we're already coming from login and still have no session,
-      // something is wrong with auth flow - let the client handle it
-      if (isFromLogin && path !== '/login') {
-        console.log('[Middleware] Potential redirect loop detected, allowing client to handle');
-        return res;
-      }
-      
-      // Get the base URL for redirection
-      const redirectUrl = req.nextUrl.clone();
-      redirectUrl.pathname = '/login';
-      redirectUrl.search = `?redirectTo=${encodeURIComponent(path)}`;
-      
-      return NextResponse.redirect(redirectUrl);
-    }
-    
-    // User is authenticated, allow access
-    return res;
-    
-  } catch (error) {
-    console.error(`[Middleware] Auth error:`, error);
-    
-    // In case of error, redirect to login as a fallback
-    const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = '/login';
-    
-    return NextResponse.redirect(redirectUrl);
+const PUBLIC_PAGE_ROUTES = [
+  '/',
+  '/login',
+  '/signup',
+  '/about',
+  '/error', // An error page should be public
+  '/auth/confirm', // Auth confirmation page
+];
+
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Skip middleware for static assets and specific public files
+  if (PUBLIC_STATIC_ASSET_PATTERNS.some(pattern => pattern.test(pathname))) {
+    return NextResponse.next();
   }
+  
+  // The updateSession function handles session refresh for all other routes.
+  // It's important for it to run to keep the session alive.
+  const response = await updateSession(request);
+
+  // After session is potentially refreshed, get user for protection logic
+  // We need a new Supabase client instance here that can read the potentially updated cookies from `updateSession`
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) { return request.cookies.get(name)?.value },
+        set(name: string, value: string, options: CookieOptions) { response.cookies.set({ name, value, ...options }) },
+        remove(name: string, options: CookieOptions) { response.cookies.delete({ name, ...options }) },
+      },
+    }
+  );
+  
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // If user is not logged in and trying to access a protected page
+  if (!user && !PUBLIC_PAGE_ROUTES.includes(pathname) && !PUBLIC_API_ROUTES.includes(pathname) && !pathname.startsWith('/api/auth')) {
+    // For API routes, let them handle their own 401s if not public
+    if (pathname.startsWith('/api/')) {
+        // Allow request to proceed; API route will handle auth.
+        // console.log(`[Middleware] No session for protected API route ${pathname}. Allowing request to proceed.`);
+        return response;
+    }
+    // For page routes, redirect to login
+    // console.log(`[Middleware] No session for protected page ${pathname}, redirecting to login.`);
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('redirectTo', pathname + request.nextUrl.search);
+    return NextResponse.redirect(url);
+  }
+
+  // If user is logged in and tries to access login/signup, redirect to dashboard
+  if (user && (pathname === '/login' || pathname === '/signup')) {
+    // console.log(`[Middleware] User logged in, redirecting from ${pathname} to /dashboard/admin.`);
+    return NextResponse.redirect(new URL('/dashboard/admin', request.url));
+  }
+  
+  return response;
 }
 
-// Configure which paths the middleware should run on
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - manifest.json, robots.txt, favicon.ico (specific public files)
+     * - Content under /fonts, /images, /static (your public asset folders)
+     * - Common image extensions (svg, png, jpg, jpeg, gif, webp)
+     * This aims to run the middleware on pages and API routes, not static assets.
+     */
+    '/((?!_next/static|_next/image|manifest.json|robots.txt|favicon.ico|fonts/|images/|static/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
-};
+}

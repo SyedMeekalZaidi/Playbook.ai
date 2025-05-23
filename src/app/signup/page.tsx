@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/components/ClientSessionProvider';
 import { Card, Form, Button, Container, Row, Col, Alert } from 'react-bootstrap';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -25,7 +25,12 @@ export default function Signup() {
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   
   const router = useRouter();
-  const { signUp } = useAuth();
+
+  // Use the correct Supabase client
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,24 +51,33 @@ export default function Signup() {
     }
 
     try {
-      const { user, error } = await signUp(email, password, role, secretKey);
+      // Register user with Supabase Auth - include role in metadata
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            role: role // Store role in Supabase Auth user metadata
+          }
+        }
+      });
 
       if (error) {
         setStatusMessage({
           type: 'error',
           message: error.message || 'Failed to sign up'
         });
+        setIsLoading(false);
         return;
       }
 
-      if (user) {
+      if (data?.user) {
         setStatusMessage({
           type: 'success',
           message: 'Account created successfully! Redirecting to login...'
         });
-        
         setTimeout(() => {
-          router.push('/login');
+          window.location.href = '/login';
         }, 2000);
       }
     } catch (error: any) {
