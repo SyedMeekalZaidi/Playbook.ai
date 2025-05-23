@@ -2,15 +2,23 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Status } from '@prisma/client';
 import { handleApiError } from '@/lib/api-utils';
+import { createApiClient } from '@/utils/supabase/server';
+
+// Helper to require authentication
+async function requireUser() {
+  const supabase = await createApiClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    throw new Error('User not authenticated');
+  }
+  return user;
+}
 
 export async function GET(req:Request) {
     try {
+        const user = await requireUser();
         const { searchParams } = new URL(req.url);
-        const userId = searchParams.get('userId');
-
-        if (!userId) {
-            return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-        }
+        const userId = searchParams.get('userId') || user.id;
 
         const events = await prisma.event.findMany({
             where: {
@@ -19,22 +27,23 @@ export async function GET(req:Request) {
         });
 
         return NextResponse.json(events);
-    } catch (error) {
+    } catch (error: any) {
+        if (error.message === 'User not authenticated') {
+            return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+        }
         return handleApiError(error, 'Failed to fetch events');
     }
 }
 
 export async function POST(req:Request){
     try{
+        const user = await requireUser();
         const body = await req.json();
         console.log(body);
-        const {name, description, ownerId, playbookId, currentProcessId, parameters} = body;
+        const {name, description, playbookId, currentProcessId, parameters} = body;
 
         if (!name) {
             return NextResponse.json({ error: 'Event name is required' }, { status: 400 });
-        }
-        if (!ownerId) {
-            return NextResponse.json({ error: 'Owner ID is required' }, { status: 400 });
         }
         if (!playbookId) {
             return NextResponse.json({ error: 'Playbook ID is required' }, { status: 400 });
@@ -48,7 +57,7 @@ export async function POST(req:Request){
                 // id is defaulted to uuid() by schema
                 name: name,
                 description: description,
-                ownerId: ownerId,
+                ownerId: user.id,
                 playbookId: playbookId,
                 currentProcessId: currentProcessId,
                 parameters: parameters || [],
@@ -58,7 +67,10 @@ export async function POST(req:Request){
         });
         return NextResponse.json(event, { status: 201 });
 
-    } catch (error) {
+    } catch (error: any) {
+        if (error.message === 'User not authenticated') {
+            return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+        }
         return handleApiError(error, 'Failed to create event');
     }
 }

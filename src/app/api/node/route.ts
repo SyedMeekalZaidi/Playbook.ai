@@ -1,10 +1,22 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { handleApiError } from '@/lib/api-utils';
+import { createApiClient } from '@/utils/supabase/server';
+
+// Helper to require authentication
+async function requireUser() {
+  const supabase = await createApiClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    throw new Error('User not authenticated');
+  }
+  return user;
+}
 
 // Get nodes (filter by process ID if provided)
 export async function GET(req: Request) {
   try {
+    await requireUser();
     const { searchParams } = new URL(req.url);
     const processId = searchParams.get('processId');
     const nodeId = searchParams.get('id');
@@ -36,6 +48,9 @@ export async function GET(req: Request) {
       return NextResponse.json(nodes);
     }
   } catch (error: any) {
+    if (error.message === 'User not authenticated') {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
     return handleApiError(error, 'Error fetching nodes');
   }
 }
@@ -43,6 +58,7 @@ export async function GET(req: Request) {
 // Create a new node
 export async function POST(req: Request) {
   try {
+    await requireUser();
     const body = await req.json();
     const { name, type, processId, bpmnId, shortDescription, documentContent } = body;
     
@@ -65,6 +81,9 @@ export async function POST(req: Request) {
     
     return NextResponse.json(node, { status: 201 });
   } catch (error: any) {
+    if (error.message === 'User not authenticated') {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
     return handleApiError(error, 'Error creating node');
   }
 }
@@ -72,6 +91,7 @@ export async function POST(req: Request) {
 // Update a node
 export async function PATCH(req: Request) {
   try {
+    await requireUser();
     const body = await req.json();
     const { id, ...updateData } = body;
     
@@ -93,6 +113,9 @@ export async function PATCH(req: Request) {
     
     return NextResponse.json(node);
   } catch (error: any) {
+    if (error.message === 'User not authenticated') {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
     if (error.code === 'P2025') {
         return NextResponse.json({ error: 'Node not found' }, { status: 404 });
     }
@@ -103,6 +126,7 @@ export async function PATCH(req: Request) {
 // Delete a node
 export async function DELETE(req: Request) {
   try {
+    await requireUser();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     
@@ -116,6 +140,9 @@ export async function DELETE(req: Request) {
     
     return NextResponse.json({ success: true, message: 'Node deleted successfully' });
   } catch (error: any) {
+    if (error.message === 'User not authenticated') {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
     if (error.code === 'P2025') {
         return NextResponse.json({ error: 'Node not found' }, { status: 404 });
     }

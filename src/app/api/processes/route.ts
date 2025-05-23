@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { handleApiError } from '@/lib/api-utils';
+import { createApiClient } from '@/utils/supabase/server';
 
 interface NodeData {
   id?: string; // Optional: ID might not be provided for new nodes
@@ -23,9 +24,20 @@ interface ProcessDependencyData {
   trigger?: string;
 }
 
+// Helper to require authentication
+async function requireUser() {
+  const supabase = await createApiClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    throw new Error('User not authenticated');
+  }
+  return user;
+}
+
 // Get a list of all processes or processes filtered by playbookId
 export async function GET(request: Request) {
   try {
+    await requireUser();
     const { searchParams } = new URL(request.url);
     const playbookId = searchParams.get('playbookId');
 
@@ -47,7 +59,10 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(processes);
 
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === 'User not authenticated') {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
     return handleApiError(error, "Error fetching processes");
   }
 }
@@ -55,6 +70,7 @@ export async function GET(request: Request) {
 // Create a new process
 export async function POST(req: Request) {
   try {
+    await requireUser();
     const body = await req.json();
     const {
       playbookId,
@@ -139,7 +155,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(newProcess, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === 'User not authenticated') {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
     return handleApiError(error, "Error creating process");
   }
 }

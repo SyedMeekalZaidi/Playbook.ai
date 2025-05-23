@@ -1,10 +1,8 @@
-import { supabase } from './supabase';
+import { createClient, createApiClient } from '@/utils/supabase/server';
 import { NextRequest } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 
 /**
- * Get the current authenticated user from a request
+ * Get the current authenticated user from a request (API route)
  */
 export async function getCurrentUser(req: NextRequest) {
   try {
@@ -13,16 +11,13 @@ export async function getCurrentUser(req: NextRequest) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return { user: null, error: 'No auth token provided' };
     }
-    
     const token = authHeader.split(' ')[1];
-    
-    // Verify the token and get the user
+    // Use the API client to verify the token and get the user
+    const supabase = await createApiClient();
     const { data, error } = await supabase.auth.getUser(token);
-    
     if (error || !data.user) {
       return { user: null, error: error?.message || 'User not found' };
     }
-    
     return { user: data.user, error: null };
   } catch (error: any) {
     console.error('Error getting current user:', error);
@@ -35,30 +30,12 @@ export async function getCurrentUser(req: NextRequest) {
  */
 export async function getServerUser() {
   try {
-    const supabaseServer = createServerComponentClient({ cookies });
-    const { data: { user } } = await supabaseServer.auth.getUser();
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
     return { user, error: null };
   } catch (error: any) {
     console.error('Error getting server user:', error);
     return { user: null, error: error.message };
-  }
-}
-
-/**
- * Get the current authenticated session from server components
- */
-export async function getServerSession() {
-  try {
-    const supabaseServer = createServerComponentClient({ cookies });
-    const { data } = await supabaseServer.auth.getSession();
-    return { 
-      session: data.session, 
-      user: data.session?.user || null,
-      error: null 
-    };
-  } catch (error: any) {
-    console.error('Error getting server session:', error);
-    return { session: null, user: null, error: error.message };
   }
 }
 
@@ -71,28 +48,25 @@ export function hasRole(user: any, role: string): boolean {
 }
 
 /**
- * Verifies if the session is valid and returns auth status
+ * Verifies if the session is valid and returns auth status (API route)
  */
 export async function verifySession(req: NextRequest) {
   try {
     // Check for token in cookie rather than auth header
     const cookieHeader = req.headers.get('cookie');
-    
     if (!cookieHeader) {
       return { authenticated: false, error: 'No cookies provided' };
     }
-    
-    // Use supabase admin to verify the session without needing the token directly
+    // Use supabase API client to verify the session
+    const supabase = await createApiClient();
     const { data, error } = await supabase.auth.getUser();
-    
     if (error || !data.user) {
       return { authenticated: false, error: error?.message || 'Session invalid' };
     }
-    
-    return { 
-      authenticated: true, 
+    return {
+      authenticated: true,
       user: data.user,
-      error: null 
+      error: null
     };
   } catch (error: any) {
     console.error('Session verification error:', error);

@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { PlaybookAPI, ProcessAPI, NodeAPI } from '@/services/api'; // Import API services
 import { Playbook, Process } from '@/types/api'; // Import types
 import { DebugEntry } from './interfaces'; // Removed User import as DEFAULT_USER is removed
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'; // Import Supabase client
+import { createClient } from '@/lib/supabase'; // Use new browser client
 
 export const useModeler = () => {
   const modelerRef = useRef<any>(null);
@@ -27,7 +27,7 @@ export const useModeler = () => {
   const [isLoadingProcesses, setIsLoadingProcesses] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('new');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
 
   useEffect(() => {
     setIsClient(true);
