@@ -4,6 +4,8 @@ import ProcessTree from './ProcessTree';
 import Form from 'react-bootstrap/Form';
 import Spinner from 'react-bootstrap/Spinner';
 import { PlaybookAPI } from '@/services/api'; // Import PlaybookAPI
+import { FiUser, FiUsers, FiCopy } from 'react-icons/fi';
+import Select from 'react-select';
 
 interface Playbook {
   id: string;
@@ -24,13 +26,35 @@ interface EnhancedSidebarProps {
   user: User; // must pass User as input
 }
 
+// Helper to determine playbook type
+function getPlaybookType(playbook: any, user: User) {
+  if (playbook.type) return playbook.type;
+  if (playbook.sourcePlaybook) return 'implementor';
+  if (playbook.ownerId === user.id) return 'my';
+  return 'collaboration';
+}
+
+function getPlaybookIcon(type: string) {
+  if (type === 'implementor') return <FiCopy className="playbook-icon" title="Implemented Playbook" style={{ color: '#14213D' }} />;
+  if (type === 'collaboration') return <FiUsers className="playbook-icon" title="Collaboration Playbook" style={{ color: '#14213D' }} />;
+  return <FiUser className="playbook-icon" title="My Playbook" style={{ color: '#14213D' }} />;
+}
+
+function getDisplayName(playbook: any, type: string) {
+  if (type === 'implementor' && playbook.sourcePlaybook?.name) return playbook.sourcePlaybook.name;
+  let name = playbook.name;
+  // Remove trailing ' <email> Implementation' (not Implementor)
+  name = name.replace(/\s+[^\s]+@[^\s]+\s+Implementation$/, '');
+  return name;
+}
+
 const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
   defaultPlaybookId,
   onSelectProcess,
   onSelectNode,
   user
 }) => {
-  const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
+  const [playbooks, setPlaybooks] = useState<any[]>([]);
   const [selectedPlaybookId, setSelectedPlaybookId] = useState<string>(defaultPlaybookId || '');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,22 +63,34 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
     const fetchPlaybooks = async () => {
       setLoading(true);
       setError(null);
-
       try {
-        let fetchedPlaybooks;
+        let myPlaybooks: any[] = [];
+        let implementorPlaybooks: any[] = [];
+        let collaborationPlaybooks: any[] = [];
         if (user.role === 'ADMIN') {
-          fetchedPlaybooks = await PlaybookAPI.getAll({ ownerId: user.id });
-        } else { // Assuming 'USER' or other roles see published playbooks
-          fetchedPlaybooks = await PlaybookAPI.getAll({ status: 'PUBLISHED' });
+          myPlaybooks = await PlaybookAPI.getAll({ ownerId: user.id, isCopy: false });
+        } else {
+          myPlaybooks = await PlaybookAPI.getAll({ ownerId: user.id, isCopy: false });
         }
+        implementorPlaybooks = await PlaybookAPI.getImplementorPlaybooks();
+        collaborationPlaybooks = await PlaybookAPI.getCollaborationPlaybooks();
 
-        setPlaybooks(fetchedPlaybooks || []);
+        // Tag each with a type
+        const my = (myPlaybooks || []).map(pb => ({ ...pb, type: 'my' }));
+        const impl = (implementorPlaybooks || []).map(pb => ({ ...pb, type: 'implementor' }));
+        const collab = (collaborationPlaybooks || []).map(pb => ({ ...pb, type: 'collaboration' }));
 
-        // If no playbook is selected and we have playbooks, select the first one
-        if (!selectedPlaybookId && fetchedPlaybooks && fetchedPlaybooks.length > 0) {
-          setSelectedPlaybookId(fetchedPlaybooks[0].id);
+        // Remove duplicates (by id)
+        const all = [...my, ...impl, ...collab];
+        const uniqueMap = new Map();
+        all.forEach(pb => {
+          uniqueMap.set(pb.id, pb);
+        });
+        const merged = Array.from(uniqueMap.values());
+        setPlaybooks(merged);
+        if (!selectedPlaybookId && merged.length > 0) {
+          setSelectedPlaybookId(merged[0].id);
         }
-
       } catch (err: any) {
         console.error('Error fetching playbooks:', err);
         setError(err instanceof Error ? err.message : '[Sidebar] Failed to load playbooks');
@@ -62,37 +98,43 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
         setLoading(false);
       }
     };
-
     fetchPlaybooks();
-  }, [user.id, user.role, selectedPlaybookId]); // Added user.role dependency
+  }, [user.id, user.role, selectedPlaybookId]);
 
-  const handlePlaybookChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedPlaybookId(e.target.value);
-  };
+  const playbookOptions = playbooks.map(playbook => {
+    const type = getPlaybookType(playbook, user);
+    return {
+      value: playbook.id,
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center' }}>
+          {getPlaybookIcon(type)}
+          <span>{getDisplayName(playbook, type)}</span>
+        </span>
+      ),
+      playbook,
+      type,
+    };
+  });
+
+  const selectedOption = playbookOptions.find(opt => opt.value === selectedPlaybookId) || null;
 
   return (
     <div className="sidebar-wrapper">
       <div className="playbook-selector">
         <Form.Group controlId="playbookSelect">
           <Form.Label>Select Playbook</Form.Label>
-          <Form.Select
-            value={selectedPlaybookId}
-            onChange={handlePlaybookChange}
-            disabled={loading || playbooks.length === 0}
-          >
-            {playbooks.length === 0 ? (
-              <option value="">No playbooks available</option>
-            ) : (
-              <>
-                <option value="">-- Select a Playbook --</option>
-                {playbooks.map(playbook => (
-                  <option key={playbook.id} value={playbook.id}>
-                    {playbook.name}
-                  </option>
-                ))}
-              </>
-            )}
-          </Form.Select>
+          <Select
+            options={playbookOptions}
+            value={selectedOption}
+            onChange={opt => setSelectedPlaybookId(opt ? opt.value : '')}
+            isClearable={false}
+            isSearchable={true}
+            classNamePrefix="react-select"
+            styles={{
+              option: (provided) => ({ ...provided, display: 'flex', alignItems: 'center' }),
+              singleValue: (provided) => ({ ...provided, display: 'flex', alignItems: 'center' }),
+            }}
+          />
         </Form.Group>
 
         {loading && (
