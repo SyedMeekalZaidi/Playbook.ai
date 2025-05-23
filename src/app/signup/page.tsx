@@ -14,8 +14,6 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('USER');
-  const [secretKey, setSecretKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error' | 'info' | 'warning' | '';
@@ -55,11 +53,6 @@ export default function Signup() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            role: role // Store role in Supabase Auth user metadata
-          }
-        }
       });
 
       if (error) {
@@ -74,11 +67,11 @@ export default function Signup() {
       if (data?.user) {
         setStatusMessage({
           type: 'success',
-          message: 'Account created successfully! Redirecting to login...'
+          message: 'Account created successfully! Please check your inbox for a confirmation email before logging in.'
         });
         setTimeout(() => {
           window.location.href = '/login';
-        }, 2000);
+        }, 4000);
       }
     } catch (error: any) {
       setStatusMessage({
@@ -196,38 +189,6 @@ export default function Signup() {
                       </Button>
                     </div>
                   </Form.Group>
-                  
-                  <Form.Group className="mb-4">
-                    <Form.Label className="fw-bold">Role</Form.Label>
-                    <Form.Select 
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      className="py-2"
-                    >
-                      <option value="USER">Regular User</option>
-                      <option value="PLAYBOOK_CREATOR">Playbook Creator</option>
-                      <option value="ADMIN">Administrator</option>
-                    </Form.Select>
-                  </Form.Group>
-                  
-                  {role === 'ADMIN' && (
-                    <Form.Group className="mb-4">
-                      <Form.Label className="fw-bold">Admin Secret Key</Form.Label>
-                      <div className="input-group">
-                        <span className="input-group-text bg-light">
-                          <i className="bi bi-key"></i>
-                        </span>
-                        <Form.Control
-                          type="password"
-                          value={secretKey}
-                          onChange={(e) => setSecretKey(e.target.value)}
-                          placeholder="Enter the admin secret key"
-                          required
-                          className="py-2"
-                        />
-                      </div>
-                    </Form.Group>
-                  )}
                   
                   <motion.div
                     whileHover={{ scale: 1.02 }}

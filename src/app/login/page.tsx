@@ -42,9 +42,17 @@ export default function Login() {
       });
 
       if (error) {
+        let errorMsg = error.message || 'Invalid email or password';
+        if (
+          errorMsg.toLowerCase().includes('email not confirmed') ||
+          errorMsg.toLowerCase().includes('email confirmation required') ||
+          errorMsg.toLowerCase().includes('user has not confirmed')
+        ) {
+          errorMsg = 'You need to confirm your email before logging in. Please check your inbox for a confirmation email.';
+        }
         setStatusMessage({
           type: 'error',
-          message: error.message || 'Invalid email or password'
+          message: errorMsg
         });
         setIsLoading(false);
         return;

@@ -189,8 +189,3 @@ enum Status {
   CANCELLED
   PUBLISHED
 }
-
-enum MemberRole {
-  VIEWER
-  EDITOR
-}

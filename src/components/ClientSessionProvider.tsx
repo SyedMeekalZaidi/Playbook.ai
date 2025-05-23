@@ -11,7 +11,7 @@ type AuthContextType = {
   session: Session | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ user: User | null; error: Error | null }>;
-  signUp: (email: string, password: string, role: string, secretKey?: string) => Promise<{ user: User | null; error: Error | null }>;
+  signUp: (email: string, password: string) => Promise<{ user: User | null; error: Error | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -130,23 +130,11 @@ export function ClientSessionProvider({ children }: { children: React.ReactNode 
   };
 
   // Sign up new user
-  const signUp = async (email: string, password: string, role: string, secretKey?: string) => {
-    const ADMIN_SECRET_KEY = process.env.NEXT_PUBLIC_ADMIN_SECRET_KEY;
-    if (role === 'ADMIN' && secretKey !== ADMIN_SECRET_KEY) {
-      return {
-        user: null,
-        error: new Error('Invalid admin secret key')
-      };
-    }
+  const signUp = async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            role: role
-          }
-        }
       });
       if (error) throw error;
       if (data.user) {
