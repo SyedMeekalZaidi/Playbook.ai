@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { handleApiError } from '@/lib/api-utils';
 import { PrismaClient, Role, Playbook as PrismaPlaybook, Process as PrismaProcess, Node as PrismaNode, ProcessParameter as PrismaProcessParameter, DocumentImage as PrismaDocumentImage } from '@prisma/client';
-import { createApiClient } from '@/utils/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 
 interface ShareRequestItem {
   email: string;
@@ -182,7 +182,7 @@ async function deepCopyPlaybook(
 }
 
 export async function POST(req: Request, { params }: ShareParams) {
-  const supabase = await createApiClient();
+  const supabase = createClient();
   const { data: { user: authenticatedUser }, error: authError } = await supabase.auth.getUser();
 
   if (authError || !authenticatedUser) {

@@ -43,6 +43,7 @@ class DatabaseIntegration {
 
   // Track processed elements to prevent duplicate handling
   private processedElements: Set<string> = new Set();
+  private isImporting: boolean = false; // Flag to indicate import operation
 
   constructor(eventBus: any, elementRegistry: any, modeling: any) {
     this.eventBus = eventBus;
@@ -85,6 +86,11 @@ class DatabaseIntegration {
     // Listen for element updates
     this.eventBus.on('element.changed', (event: any) => {
       const { element } = event;
+      // Do not trigger update if we are in the middle of an import and sync cycle,
+      // or if onElementUpdate is temporarily disabled (e.g. during syncDatabaseElements)
+      if (this.isImporting && !this.onElementUpdate) {
+        return;
+      }
       this.handleElementUpdated(element);
     });
 
@@ -92,8 +98,6 @@ class DatabaseIntegration {
     this.eventBus.on('shape.remove', (event: any) => {
       const { element } = event;
       this.handleElementRemoved(element);
-      // Remove from processed set
-      this.processedElements.delete(element.id);
     });
 
     // Listen for connection creation
@@ -114,22 +118,33 @@ class DatabaseIntegration {
     this.eventBus.on('connection.remove', (event: any) => {
       const { element } = event;
       this.handleElementRemoved(element);
-      this.processedElements.delete(element.id);
     });
 
-    // Track existing elements when diagram loaded
-    this.eventBus.on('import.done', () => {
-      // Clear any previous elements
-      this.processedElements.clear();
+    this.eventBus.on('import.parse.start', () => {
+      this.isImporting = true;
+      console.log('[DatabaseIntegration] import.parse.start: isImporting = true');
+    });
 
-      // Add all existing elements to the processed set
-      // And attempt to sync them with DB info
+    this.eventBus.on('import.done', (event: any) => {
+      console.log('[DatabaseIntegration] import.done event fired.');
+      if (event.error) {
+        console.error('[DatabaseIntegration] Import failed:', event.error);
+        this.isImporting = false; 
+        this.processedElements.clear(); 
+        return;
+      }
+
       this.syncDatabaseElements();
 
+      this.processedElements.clear();
       const allElements = this.elementRegistry.getAll();
       allElements.forEach((element: any) => {
         this.processedElements.add(element.id);
       });
+      console.log('[DatabaseIntegration] import.done: processedElements repopulated after sync.', Array.from(this.processedElements));
+      
+      this.isImporting = false; 
+      console.log('[DatabaseIntegration] import.done: isImporting = false');
     });
   }
 
@@ -174,6 +189,12 @@ class DatabaseIntegration {
       return;
     }
 
+    // Only store nodes, not connections
+    if (!this.isStorableNode(element)) {
+      console.log("Skipping non-storable element (not a node):", element.type, element.id);
+      return;
+    }
+
     // Get element details
     const elementType = this.getBpmnElementType(element);
     const elementName = this.getElementName(element);
@@ -181,9 +202,7 @@ class DatabaseIntegration {
     console.log(`Creating ${elementType} element: ${element.id} (${elementName})`);
 
     try {
-      // Create a new database entity based on the element type
       if (elementType === 'process') {
-        // Handle process/participant creation
         this.onElementCreate({
           type: 'process',
           data: {
@@ -200,7 +219,6 @@ class DatabaseIntegration {
           console.error('Failed to create process in database:', err);
         });
       } else {
-        // Handle node creation (tasks, events, gateways, connections, etc.)
         this.onElementCreate({
           type: 'node',
           data: {
@@ -212,7 +230,7 @@ class DatabaseIntegration {
         }).then(result => {
           if (result && result.id) {
             this.setDatabaseId(element.id, result.id, 'node');
-            console.log(`Node ${element.id} (${elementType}) saved with DB ID: ${result.id}`);
+            console.log(`[handleElementCreated] Set dbId for element ${element.id}: ${result.id}`);
           }
         }).catch(err => {
           console.error('Failed to create node in database:', err);
@@ -241,69 +259,94 @@ class DatabaseIntegration {
 
   // Handle element update
   private handleElementUpdated(element: any): void {
-    if (!element || !this.onElementUpdate) return;
+    if (!element || !this.onElementUpdate || !this.isValidBpmnElement(element)) return;
 
-    // Skip non-BPMN elements
-    if (!this.isValidBpmnElement(element)) return;
+    let currentDbId = element.businessObject?.dbId;
+    let dbType = element.businessObject?.dbType;
 
-    // Check if this element has a database mapping
-    const dbInfo = this.getDatabaseInfo(element);
-    const elementDbId = element.businessObject?.dbId;
-
-    if (!dbInfo && !elementDbId) {
-      console.log("Skipping update for element without DB info or dbId:", element.id);
-      return;
+    if (!currentDbId) {
+      const dbInfo = this.getDatabaseInfo(element); 
+      if (dbInfo) {
+        currentDbId = dbInfo.id;
+        dbType = (element.type === 'bpmn:Process' || element.type === 'bpmn:Participant') ? 'process' : 'node';
+      }
     }
 
-    const elementName = this.getElementName(element);
-    const currentDbId = dbInfo ? dbInfo.id : elementDbId;
-    const elementType = this.getBpmnElementType(element);
-    const dbType = element.businessObject?.dbType || (elementType === 'process' ? 'process' : 'node');
+    if (!currentDbId) {
+      console.log("[DatabaseIntegration] Skipping update for element without resolved DB ID:", element.id);
+      return;
+    }
+    
+    dbType = dbType || ((element.type === 'bpmn:Process' || element.type === 'bpmn:Participant') ? 'process' : 'node');
 
-    this.onElementUpdate({
-      dbId: currentDbId,
-      type: dbType,
-      data: {
-        id: currentDbId,
-        name: elementName || this.getDefaultNameForElementType(elementType),
-        bpmnId: element.id,
-        type: elementType
-      }
-    }).then(() => {
-      console.log(`Element ${element.id} (DB ID: ${currentDbId}) update processed by callback.`);
-    }).catch(err => {
-      console.error(`Failed to update element ${element.id} (DB ID: ${currentDbId}) in database:`, err);
-    });
+    const elementName = this.getElementName(element);
+    const elementType = this.getBpmnElementType(element);
+    const shortDescription = element.businessObject?.shortDescription || null;
+
+    if (this.onElementUpdate) {
+      this.onElementUpdate({
+        dbId: currentDbId, 
+        type: dbType, 
+        data: { 
+          id: currentDbId, 
+          name: elementName || this.getDefaultNameForElementType(elementType),
+          bpmnId: element.id, 
+          type: elementType, 
+          shortDescription: shortDescription,
+        }
+      }).then(() => {
+        console.log(`[DatabaseIntegration] Element ${element.id} (DB ID: ${currentDbId}) update processed by callback.`);
+      }).catch(err => {
+        console.error(`[DatabaseIntegration] Failed to update element ${element.id} (DB ID: ${currentDbId}) in database:`, err);
+      });
+    }
   }
 
   // Handle element removal
   private handleElementRemoved(element: any): void {
-    if (!element || !this.onElementDelete) return;
+    const elementId = element ? element.id : 'unknown';
+    if (!element || !this.isValidBpmnElement(element)) {
+      if (elementId !== 'unknown') this.processedElements.delete(elementId);
+      return;
+    }
 
-    // Check if this element has a database mapping
+    if (this.isImporting) {
+      console.log(`[DatabaseIntegration] Element ${elementId} removed during import, deferring DB deletion to save logic.`);
+      this.processedElements.delete(elementId);
+      return;
+    }
+
+    if (!this.onElementDelete) {
+        this.processedElements.delete(elementId);
+        return;
+    }
+
     const dbInfo = this.getDatabaseInfo(element);
-    if (!dbInfo) return;
+    if (!dbInfo || !dbInfo.id) {
+      console.log(`[DatabaseIntegration] Element ${elementId} removed from canvas, no DB info or not synced. No DB action.`);
+      this.processedElements.delete(elementId);
+      return;
+    }
 
     this.onElementDelete({
       id: dbInfo.id,
       type: element.businessObject?.dbType || (this.getBpmnElementType(element) === 'process' ? 'process' : 'node')
     }).then(() => {
-      console.log(`Element ${element.id} (DB ID: ${dbInfo.id}) deleted from database`);
+      console.log(`[DatabaseIntegration] Element ${elementId} (DB ID: ${dbInfo.id}) deletion processed by callback.`);
     }).catch(err => {
-      console.error('Failed to delete element from database:', err);
+      console.error(`[DatabaseIntegration] Failed to process deletion for element ${elementId} (DB ID: ${dbInfo.id}):`, err);
     });
+    this.processedElements.delete(elementId);
   }
 
   // Get database info for an element
   public getDatabaseInfo(element: any): Process | Node | null {
     if (!element || !element.id) return null;
 
-    // For process (diagram/participant)
     if (element.type === 'bpmn:Process' || element.type === 'bpmn:Participant') {
       return this.processes.find(p => p.bpmnId === element.id) || null;
     }
 
-    // For nodes (tasks, events, gateways, etc.)
     return this.nodes.find(n => n.bpmnId === element.id) || null;
   }
 
@@ -312,32 +355,45 @@ class DatabaseIntegration {
     try {
       const element = this.elementRegistry.get(elementId);
       if (!element) {
-        console.warn(`Element ${elementId} not found in registry`);
+        console.warn(`[DatabaseIntegration] Element ${elementId} not found in registry for setDatabaseId`);
         return false;
       }
 
-      // Set custom attribute to store DB ID
       this.modeling.updateProperties(element, {
         'dbId': databaseId,
         'dbType': type
       });
 
-      console.log(`Database ID ${databaseId} set for element ${elementId}`);
+      console.log(`[DatabaseIntegration] Database ID ${databaseId} (type: ${type}) set for element ${elementId}`);
       return true;
     } catch (error) {
-      console.error(`Error setting database ID for ${elementId}:`, error);
+      console.error(`[DatabaseIntegration] Error setting database ID for ${elementId}:`, error);
       return false;
     }
   }
 
-  // Get all elements with database IDs
-  public getElementsWithDatabaseIds(): any[] {
+  // Get info for all relevant diagram elements
+  public getDiagramElementsInfo(): any[] {
     try {
       const elements = this.elementRegistry.getAll();
-      return elements.filter((element: any) =>
-        element.businessObject && element.businessObject.dbId);
+      return elements
+        .filter((element: any) => {
+          const elementType = this.getBpmnElementType(element);
+          return this.isStorableNode(element) || elementType === 'process';
+        })
+        .map((element: any) => {
+          const elementType = this.getBpmnElementType(element);
+          return {
+            bpmnId: element.id,
+            dbId: element.businessObject.dbId,
+            dbType: element.businessObject.dbType || (elementType === 'process' ? 'process' : 'node'),
+            elementName: this.getElementName(element),
+            elementType: elementType,
+            shortDescription: element.businessObject.shortDescription || null
+          };
+        });
     } catch (error) {
-      console.error('Error getting elements with DB IDs:', error);
+      console.error('[DatabaseIntegration] Error getting diagram elements info:', error);
       return [];
     }
   }
@@ -345,12 +401,11 @@ class DatabaseIntegration {
   // Highlight an element by database ID
   public highlightElementByDatabaseId(databaseId: string): any | null {
     try {
-      const elements = this.getElementsWithDatabaseIds();
+      const elements = this.getDiagramElementsInfo();
       const targetElement = elements.find((el: any) =>
-        el.businessObject.dbId === databaseId);
+        el.dbId === databaseId);
 
       if (targetElement) {
-        // Use the event bus to notify about highlighting
         this.eventBus.fire('database.highlight', {
           element: targetElement
         });
@@ -414,34 +469,75 @@ class DatabaseIntegration {
     console.log('[DatabaseIntegration] Starting syncDatabaseElements...');
     const allDiagramElements = this.elementRegistry.getAll();
 
-    allDiagramElements.forEach((element: any) => {
-      if (!this.isValidBpmnElement(element) || element.businessObject?.dbId) {
-        return;
-      }
+    const originalOnElementUpdate = this.onElementUpdate;
+    this.onElementUpdate = null; // Temporarily disable onElementUpdate
 
-      const bpmnId = element.id;
-      let dbEntity: Process | Node | null = null;
-      let dbType: string = 'node';
+    try {
+      allDiagramElements.forEach((element: any) => {
+        if (!this.isValidBpmnElement(element)) {
+          return;
+        }
+        if (element.type === 'bpmn:SequenceFlow') {
+            return;
+        }
 
-      if (element.type === 'bpmn:Process' || element.type === 'bpmn:Participant') {
-        dbEntity = this.processes.find(p => p.bpmnId === bpmnId) || null;
-        dbType = 'process';
-      } else {
-        dbEntity = this.nodes.find(n => n.bpmnId === bpmnId) || null;
-        dbType = 'node';
-      }
+        const bpmnId = element.id;
+        let dbEntity: Process | Node | null = null;
+        let dbType: string = 'node'; 
+        
+        if (element.type === 'bpmn:Process' || element.type === 'bpmn:Participant') {
+          dbEntity = this.processes.find(p => p.bpmnId === bpmnId) || null;
+          dbType = 'process';
+        } else if (this.isStorableNode(element)) { 
+          dbEntity = this.nodes.find(n => n.bpmnId === bpmnId) || null;
+          dbType = 'node';
+        } else {
+          return; 
+        }
 
-      if (dbEntity && dbEntity.id) {
-        console.log(`[DatabaseIntegration] Syncing element ${bpmnId} with DB ID ${dbEntity.id}`);
-        this.setDatabaseId(bpmnId, dbEntity.id, dbType);
-      }
-    });
-    console.log('[DatabaseIntegration] Finished syncDatabaseElements.');
+        if (dbEntity && dbEntity.id) {
+          if (element.businessObject.dbId !== dbEntity.id || element.businessObject.dbType !== dbType) {
+            this.setDatabaseId(bpmnId, dbEntity.id, dbType); 
+          }
+        } else {
+          if (element.businessObject.dbId) {
+              console.warn(`[syncDatabaseElements] Element ${bpmnId} has a dbId (${element.businessObject.dbId}) but no matching entity in current DB data. Clearing its dbId.`);
+              this.modeling.updateProperties(element, {
+                  'dbId': undefined,
+                  'dbType': undefined
+              });
+          }
+        }
+      });
+    } catch (error) {
+        console.error("[DatabaseIntegration] Error during syncDatabaseElements:", error);
+    } finally {
+        this.onElementUpdate = originalOnElementUpdate; // Restore onElementUpdate
+        console.log('[DatabaseIntegration] Finished syncDatabaseElements.');
+    }
+  }
+
+  private isStorableNode(element: any): boolean {
+    if (!element || !element.type) return false;
+    const storableTypes = [
+      'bpmn:Task',
+      'bpmn:UserTask',
+      'bpmn:ServiceTask',
+      'bpmn:StartEvent',
+      'bpmn:EndEvent',
+      'bpmn:ExclusiveGateway',
+      'bpmn:ParallelGateway',
+      'bpmn:SubProcess',
+      'bpmn:BoundaryEvent',
+      'bpmn:IntermediateCatchEvent',
+      'bpmn:IntermediateThrowEvent',
+    ];
+    return storableTypes.includes(element.type);
   }
 }
 
-// Module definition for BPMN.js
-DatabaseIntegration.$inject = ['eventBus', 'elementRegistry', 'modeling'];
+// Move $inject assignment outside the class definition
+(DatabaseIntegration as any).$inject = ['eventBus', 'elementRegistry', 'modeling'];
 
 export default {
   __init__: ['databaseIntegration'],

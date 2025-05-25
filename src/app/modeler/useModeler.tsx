@@ -185,14 +185,17 @@ export const useModeler = () => {
   const handleSaveDiagram = async () => {
     if (!modelerRef.current) return;
 
+    setLoadError(null); // Clear previous load errors before attempting to save
+
     try {
       await modelerRef.current.saveDiagram();
-      setSaveMessage(`Process "${processName}" saved successfully!`);
-      setShowSaveSuccess(true);
-      setTimeout(() => setShowSaveSuccess(false), 3000);
+      if (!showSaveSuccess) {
+        setSaveMessage(`Process "${processName}" operation completed.`);
+        setShowSaveSuccess(true);
+        setTimeout(() => setShowSaveSuccess(false), 3000);
+      }
     } catch (error) {
-      console.error("Error saving diagram:", error);
-      setLoadError("Failed to save diagram");
+      console.error("Error during save diagram operation in useModeler:", error);
     }
   };
 
@@ -234,29 +237,35 @@ export const useModeler = () => {
     try {
       if (data.type === 'process') {
         console.warn('Process creation in useModeler.handleElementCreate needs implementation.');
-        return { id: 'temp-process-id', ...data.data }; // Placeholder
+        return { id: `temp-process-${Date.now()}`, ...data.data }; // Placeholder
       } else {
         const createNodePayload: import('@/types/api').CreateNodePayload = {
           name: data.data.name || 'New Node',
-          type: data.data.type,
+          type: data.data.type, // This is elementType e.g. 'startEvent'
           processId: processId,
           bpmnId: data.data.bpmnId,
           shortDescription: data.data.shortDescription || null,
         };
-        const newNode = await NodeAPI.create(createNodePayload);
+        const newNodeOrExisting = await NodeAPI.create(createNodePayload);
 
-        setNodes(prev => [...prev, newNode]);
-
-        addDebugEntry({
-          action: 'CREATE',
-          timestamp: new Date(),
-          elementType: data.data.type,
-          elementName: newNode.name,
-          bpmnId: newNode.bpmnId,
-          dbId: newNode.id,
+        setNodes(prevNodes => {
+          const existingNodeIndex = prevNodes.findIndex(n => n.id === newNodeOrExisting.id);
+          if (existingNodeIndex !== -1) {
+            const updatedNodes = [...prevNodes];
+            updatedNodes[existingNodeIndex] = newNodeOrExisting;
+            return updatedNodes;
+          }
+          return [...prevNodes, newNodeOrExisting];
         });
-
-        return newNode;
+        addDebugEntry({
+          action: 'CREATE_OR_FETCH',
+          timestamp: new Date(),
+          elementType: newNodeOrExisting.type,
+          elementName: newNodeOrExisting.name,
+          bpmnId: newNodeOrExisting.bpmnId,
+          dbId: newNodeOrExisting.id,
+        });
+        return newNodeOrExisting;
       }
     } catch (error) {
       console.error('Error creating element:', error);
@@ -265,31 +274,59 @@ export const useModeler = () => {
   };
 
   const handleElementUpdate = async (data: any) => {
-    console.log('Updating element:', data);
+    console.log('Updating element (useModeler):', data);
     try {
       if (data.type === 'process') {
         console.warn('Process update in useModeler.handleElementUpdate needs implementation.');
         return { ...data.data }; // Placeholder
       } else {
-        const dbId = data.dbId || data.data.id;
+        const dbId = data.dbId;
         if (!dbId) {
-          console.error('DB ID missing for node update');
+          console.error('DB ID missing for node update in useModeler');
           throw new Error('DB ID missing for node update');
         }
 
         const updateNodePayload: import('@/types/api').UpdateNodePayload = {
           id: dbId,
         };
-
         if (data.data.name !== undefined) updateNodePayload.name = data.data.name;
         if (data.data.type !== undefined) updateNodePayload.type = data.data.type;
         if (data.data.bpmnId !== undefined) updateNodePayload.bpmnId = data.data.bpmnId;
         if (data.data.shortDescription !== undefined) updateNodePayload.shortDescription = data.data.shortDescription;
 
-        const updatedNode = await NodeAPI.update(updateNodePayload);
-        
-        setNodes(prev => prev.map(n => n.id === updatedNode.id ? updatedNode : n));
+        let updatedNode;
+        try {
+          updatedNode = await NodeAPI.update(updateNodePayload);
+        } catch (updateError: any) {
+          console.warn(`Failed to update node by dbId ${dbId}, attempting fallback. Error: ${updateError.message}`);
+          const nodesInDb = await NodeAPI.getByProcess(processId);
+          const nodeByBpmnId = nodesInDb.find(n => n.bpmnId === data.data.bpmnId);
+          if (nodeByBpmnId) {
+            updateNodePayload.id = nodeByBpmnId.id;
+            updatedNode = await NodeAPI.update(updateNodePayload);
+          } else {
+            console.warn(`Node not found by bpmnId ${data.data.bpmnId} either. Re-creating.`);
+            updatedNode = await NodeAPI.create({
+              name: data.data.name || 'New Node',
+              type: data.data.type,
+              processId: processId,
+              bpmnId: data.data.bpmnId,
+              shortDescription: data.data.shortDescription || null,
+            });
+            if (modelerRef.current && updatedNode) {
+              const modeler = modelerRef.current.getModeler();
+              const elementRegistry = modeler.get('elementRegistry');
+              const modeling = modeler.get('modeling');
+              const diagramElement = elementRegistry.get(data.data.bpmnId);
+              if (diagramElement && modeling) {
+                modeling.updateProperties(diagramElement, { dbId: updatedNode.id, dbType: 'node' });
+              }
+            }
+          }
+        }
 
+        const refreshedNodes = await NodeAPI.getByProcess(processId);
+        setNodes(refreshedNodes);
         addDebugEntry({
           action: 'UPDATE',
           timestamp: new Date(),
@@ -298,7 +335,6 @@ export const useModeler = () => {
           bpmnId: updatedNode.bpmnId,
           dbId: updatedNode.id,
         });
-        
         return updatedNode;
       }
     } catch (error) {
@@ -315,9 +351,9 @@ export const useModeler = () => {
         setProcesses(prev => prev.filter(p => p.id !== data.id));
       } else {
         await NodeAPI.delete(data.id);
-        setNodes(prev => prev.filter(n => n.id !== data.id));
+        const latestNodes = await NodeAPI.getByProcess(processId);
+        setNodes(latestNodes);
       }
-
       addDebugEntry({
         action: 'DELETE',
         timestamp: new Date(),
@@ -326,7 +362,6 @@ export const useModeler = () => {
         bpmnId: 'N/A',
         dbId: data.id,
       });
-
       return { success: true };
     } catch (error) {
       console.error('Error deleting element:', error);
@@ -334,48 +369,120 @@ export const useModeler = () => {
     }
   };
 
-  const handleSaveSuccess = async (xml: string, databaseMappings: any[]) => {
-    console.log('Saving diagram XML:', xml.substring(0, 100) + '...');
+  const handleSaveSuccess = async (xml: string, diagramElementsInfo: any[]) => {
+    console.log('Saving diagram XML and syncing elements. Element count from diagram:', diagramElementsInfo.length);
+    if (!processId) {
+      console.error("ProcessId is missing, cannot save.");
+      setLoadError("Process ID is missing. Cannot save.");
+      setShowSaveSuccess(false); // Ensure success message is hidden
+      return;
+    }
+
     try {
-      if (processId) {
-        const updatedProcess = await ProcessAPI.patch(processId, {
-          bpmnXml: xml,
-        });
+      await ProcessAPI.patch(processId, { bpmnXml: xml });
+      setProcesses(prev =>
+        prev.map(p => (p.id === processId ? { ...p, bpmnXml: xml } : p))
+      );
+      console.log('Process XML updated in DB.');
 
-        setProcesses(prev =>
-          prev.map(p => p.id === processId ? { ...p, bpmnXml: xml } : p)
-        );
-      }
+      const currentDiagramBpmnIds = new Set<string>();
+      const syncPromises = [];
 
-      for (const mapping of databaseMappings) {
-        if (mapping.dbType === 'process') {
-          await ProcessAPI.patch(mapping.dbId, {
-            bpmnId: mapping.bpmnId,
-          });
-        } else {
-          await NodeAPI.update({ 
-            id: mapping.dbId, 
-            bpmnId: mapping.bpmnId 
-          });
+      const modelerInstance = modelerRef.current?.getModeler();
+      const elementRegistry = modelerInstance?.get('elementRegistry');
+      const modeling = modelerInstance?.get('modeling');
+
+      for (const elementInfo of diagramElementsInfo) {
+        if (elementInfo.dbType === 'process') {
+          console.log('Skipping process element type in node sync loop:', elementInfo.bpmnId);
+          continue;
         }
+
+        currentDiagramBpmnIds.add(elementInfo.bpmnId);
+
+        const promise = (async () => {
+          let dbNode = null;
+          // Fetch fresh nodes list for each element to minimize staleness, though less efficient.
+          const nodesInDb = await NodeAPI.getByProcess(processId); 
+          dbNode = nodesInDb.find((n: any) => n.bpmnId === elementInfo.bpmnId);
+
+          if (dbNode) {
+            const payload: import('@/types/api').UpdateNodePayload = {
+              id: dbNode.id,
+              name: elementInfo.elementName,
+              type: elementInfo.elementType,
+              bpmnId: elementInfo.bpmnId,
+              shortDescription: elementInfo.shortDescription || null,
+            };
+            await NodeAPI.update(payload); // This is line useModeler.tsx:415 from logs
+            if (elementRegistry && modeling && elementInfo.bpmnId && dbNode.id) {
+              const diagramElement = elementRegistry.get(elementInfo.bpmnId);
+              if (diagramElement && diagramElement.businessObject.dbId !== dbNode.id) {
+                modeling.updateProperties(diagramElement, { dbId: dbNode.id, dbType: 'node' });
+              }
+            }
+          } else {
+            const payload: import('@/types/api').CreateNodePayload = {
+              name: elementInfo.elementName || 'New Node',
+              type: elementInfo.elementType || 'Task',
+              processId: processId,
+              bpmnId: elementInfo.bpmnId,
+              shortDescription: elementInfo.shortDescription || null,
+            };
+            const newNode = await NodeAPI.create(payload);
+            if (elementRegistry && modeling && elementInfo.bpmnId && newNode.id) {
+              const diagramElement = elementRegistry.get(elementInfo.bpmnId);
+              if (diagramElement) {
+                modeling.updateProperties(diagramElement, { dbId: newNode.id, dbType: 'node' });
+              } else {
+                console.warn(`Diagram element ${elementInfo.bpmnId} not found in registry after create.`);
+              }
+            }
+          }
+        })();
+        syncPromises.push(promise);
       }
+
+      await Promise.all(syncPromises);
+      console.log('All diagram nodes synced (created/updated).');
+
+      const finalDbNodesForProcess = await NodeAPI.getByProcess(processId);
+      const nodesToDelete = finalDbNodesForProcess.filter(
+        (dbNode: any) => dbNode.bpmnId && !currentDiagramBpmnIds.has(dbNode.bpmnId)
+      );
+
+      if (nodesToDelete.length > 0) {
+        console.log('Nodes to delete from DB:', nodesToDelete.map(n => ({ bpmnId: n.bpmnId, id: n.id })));
+        const deletePromises = nodesToDelete.map((node: any) => NodeAPI.delete(node.id));
+        await Promise.all(deletePromises);
+        console.log(`${nodesToDelete.length} nodes deleted from DB.`);
+      } else {
+        console.log('No nodes to delete from DB.');
+      }
+
+      const refreshedNodes = await NodeAPI.getByProcess(processId);
+      setNodes(refreshedNodes);
+      console.log('Local nodes state refreshed.');
 
       addDebugEntry({
-        action: 'SAVE',
+        action: 'SAVE_SYNC',
         timestamp: new Date(),
         elementType: 'diagram',
         elementName: processName,
-        bpmnId: 'Process_1',
+        bpmnId: diagramElementsInfo.find(e => e.dbType === 'process')?.bpmnId || 'Process_Unknown',
         dbId: processId,
-        details: `Saved diagram with ${databaseMappings.length} mapped elements`,
+        details: `Saved diagram. Synced ${diagramElementsInfo.length - (diagramElementsInfo.find(e => e.dbType === 'process') ? 1: 0)} nodes. Deleted ${nodesToDelete.length} nodes.`,
       });
-
+      
+      setLoadError(null); // Clear any previous errors on full success
       setSaveMessage(`Process "${processName}" saved successfully!`);
       setShowSaveSuccess(true);
       setTimeout(() => setShowSaveSuccess(false), 3000);
-    } catch (error) {
-      console.error('Error saving diagram:', error);
-      setLoadError('Failed to save diagram to database');
+
+    } catch (error) { // This is line useModeler.tsx:478 from logs
+      console.error('Error saving diagram and syncing elements:', error);
+      setLoadError('Failed to save diagram to database. Please check console for details.');
+      setShowSaveSuccess(false); // Ensure success message is hidden on error
     }
   };
 

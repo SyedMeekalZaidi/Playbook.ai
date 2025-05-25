@@ -65,7 +65,15 @@ export async function POST(req: Request) {
     if (!name || !processId) {
       return NextResponse.json({ error: 'Name and processId are required' }, { status: 400 });
     }
-    
+    // Check for existing node with same bpmnId and processId
+    if (bpmnId) {
+      const existingNode = await prisma.node.findFirst({
+        where: { bpmnId, processId }
+      });
+      if (existingNode) {
+        return NextResponse.json(existingNode, { status: 200 });
+      }
+    }
     const node = await prisma.node.create({
       data: {
         id: crypto.randomUUID(),

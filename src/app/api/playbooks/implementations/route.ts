@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { handleApiError } from '@/lib/api-utils';
-import { createApiClient } from '@/utils/supabase/server';
+import { createClient } from '@/utils/supabase/server'; // Updated import
 
 export async function GET(req: Request) {
   try {
     // Get authenticated user from supabase cookie
-    const supabase = await createApiClient();
+    const supabase = createClient(); // Use the new server client
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError) {

@@ -66,6 +66,8 @@ model Node {
   DocumentImage    DocumentImage[]
   Process          Process            @relation(fields: [processId], references: [id], onDelete: Cascade)
   ProcessParameter ProcessParameter[]
+
+  @@unique([bpmnId, processId]) // Ensure uniqueness of BPMN node per process
 }
 
 model Playbook {

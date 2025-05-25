@@ -152,63 +152,55 @@ const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props
   useEffect(() => {
     if (!modeler || !databaseIntegration || !processId) return;
     
-    debugLog('Checking for existing BPMN diagram to load');
+    debugLog('Effect: Checking for existing BPMN diagram to load or create new.');
     
-    // Check if there's an existing diagram to load
     const process = processes.find(p => p.id === processId);
     
     if (process && process.bpmnXml && process.bpmnXml.trim() !== '') {
-      debugLog('Loading existing BPMN diagram from XML', { processId, xmlLength: process.bpmnXml.length });
+      debugLog('Effect: Loading existing BPMN diagram from XML', { processId, xmlLength: process.bpmnXml.length });
       
-      try {
-        modeler.importXML(process.bpmnXml)
-          .then(() => {
-            debugLog('Existing diagram loaded successfully');
-            const canvas = modeler.get('canvas');
-            canvas.zoom('fit-viewport');
-            
-            // Update UI elements with database information
-            if (databaseIntegration) {
-              debugLog('Syncing database elements with diagram');
-              if (typeof databaseIntegration.syncDatabaseElements === 'function') {
-                databaseIntegration.syncDatabaseElements();
-              } else {
-                console.warn('[BpmnModeler] databaseIntegration.syncDatabaseElements is not a function. Syncing might not occur.');
-              }
+      modeler.importXML(process.bpmnXml)
+        .then(() => {
+          debugLog('Effect: Existing diagram loaded successfully');
+          const canvas = modeler.get('canvas');
+          canvas.zoom('fit-viewport');
+          
+          if (databaseIntegration) {
+            debugLog('Effect: Syncing database elements with diagram after import');
+            if (typeof databaseIntegration.syncDatabaseElements === 'function') {
+              databaseIntegration.syncDatabaseElements();
+            } else {
+              console.warn('[BpmnModeler] databaseIntegration.syncDatabaseElements is not a function.');
             }
-          })
-          .catch((err: any) => {
-            console.error('Error importing existing diagram:', err);
-            createNewDiagram();
-          });
-      } catch (error) {
-        console.error('Error importing XML:', error);
-        createNewDiagram();
-      }
+          }
+        })
+        .catch((err: any) => {
+          console.error('Effect: Error importing existing diagram, attempting to create new as fallback:', err);
+          // Fallback to new diagram, but don't call props.onError for this specific failure path
+          // as it might be a post-save refresh that failed to load.
+          createNewDiagram(true); // Pass true to indicate it's a fallback from import error
+        });
     } else {
-      debugLog('No existing XML found, creating new diagram');
-      createNewDiagram();
+      debugLog('Effect: No existing XML found for current processId or process not found, creating new diagram');
+      // This is an initial creation or when process has no XML. Errors here are more critical.
+      createNewDiagram(false); 
     }
-  }, [modeler, databaseIntegration, processes, processId]); // Removed `nodes` from dependency array
+  }, [modeler, databaseIntegration, processId, processes]);
   
   // Create a new diagram
-  const createNewDiagram = async () => {
+  const createNewDiagram = async (isFallbackFromImportError: boolean) => {
     if (!modeler) return;
     
-    debugLog('Creating new BPMN diagram');
+    debugLog(`Effect: Creating new BPMN diagram. Is fallback from import error: ${isFallbackFromImportError}`);
     
     try {
-      // Create empty diagram
       await modeler.createDiagram();
-      
-      // Zoom to fit the canvas
       const canvas = modeler.get('canvas');
       canvas.zoom('fit-viewport');
-      
-      debugLog('New diagram created successfully');
+      debugLog('Effect: New diagram created successfully');
     } catch (err: any) {
-      console.error('Error creating new BPMN diagram:', err);
-      if (onError) {
+      console.error('Effect: Error creating new BPMN diagram:', err);
+      if (onError && !isFallbackFromImportError) { // Only call onError if not a fallback from an import error
         onError(`Failed to create new diagram: ${err.message || 'Unknown error'}`);
       }
     }
@@ -218,41 +210,32 @@ const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props
   const saveDiagram = async () => {
     if (!modeler || !databaseIntegration) {
       debugLog('Cannot save: modeler not initialized');
-      return;
+      throw new Error('Modeler not initialized');
     }
     
     debugLog('Saving diagram');
     setIsSaving(true);
     
     try {
-      // Export as XML
       const { xml } = await modeler.saveXML({ format: true });
+      const diagramElementsInfo = databaseIntegration.getDiagramElementsInfo();
       
-      // Collect database mappings
-      const elementsWithDbIds = databaseIntegration.getElementsWithDatabaseIds();
-      
-      const databaseMappings = elementsWithDbIds.map((element: any) => ({
-        bpmnId: element.id,
-        dbId: element.businessObject.dbId,
-        dbType: element.businessObject.dbType || 'node'
-      }));
-      
-      debugLog('Diagram saved:', { 
+      debugLog('Diagram elements info collected:', { 
         xmlLength: xml.length,
-        mappingsCount: databaseMappings.length
+        mappingsCount: diagramElementsInfo.length
       });
       
-      // Call parent save handler
       if (onSave) {
-        await onSave(xml, databaseMappings);
+        await onSave(xml, diagramElementsInfo);
       }
       
       return xml;
     } catch (err: any) {
-      console.error('Error saving diagram:', err);
+      console.error('Error saving diagram in BpmnModelerComponent:', err);
       if (onError) {
         onError(`Failed to save diagram: ${err.message || 'Unknown error'}`);
       }
+      throw err; // Re-throw the error so the caller knows the save failed
     } finally {
       setIsSaving(false);
     }
