@@ -17,6 +17,20 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/ClientSessionProvider';
 import EnhancedSidebar from '@/components/EnhancedSidebar';
 import {User, UserProvider} from '@/components/UserContext';
+import { DashboardProvider, useDashboardContext } from '@/components/DashboardContext'; // Import DashboardProvider and hook
+
+// Inner component to consume context for EnhancedSidebar
+const DashboardSidebarWithContext: React.FC<{ user: User }> = ({ user }) => {
+  const { activePlaybookId, setActivePlaybookId } = useDashboardContext(); // Removed sidebarRefreshNonce
+  return (
+    <EnhancedSidebar
+      user={user}
+      currentPlaybookId={activePlaybookId}
+      onPlaybookChange={setActivePlaybookId}
+      fetchMode='mount-only' // Specify fetch mode for dashboard
+    />
+  );
+};
 
 export default function DashboardLayout(
   {children,}: {children: React.ReactNode;}){
@@ -61,16 +75,20 @@ export default function DashboardLayout(
     }
 
     return(
-        <UserProvider user={user}>
+      <UserProvider user={user}>
+        <DashboardProvider> {/* Wrap with DashboardProvider */}
           <div className="page-container bg-gray-50 min-h-screen">
             <NavBar />
-            {/* Sidebar */}
             <div className="d-flex flex-column flex-lg-row pt-2">
-                <EnhancedSidebar user={user}/>
+              {/* EnhancedSidebar now uses context */}
+              <DashboardSidebarWithContext user={user} />
+              <main className="flex-grow-1 p-3"> {/* Add a main tag for the content */}
                 {children}
+              </main>
             </div>
           </div>
-        </UserProvider>
+        </DashboardProvider>
+      </UserProvider>
     )
 }
 

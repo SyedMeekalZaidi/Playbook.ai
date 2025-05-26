@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 
 interface Process {
   id: string;
@@ -25,6 +25,7 @@ interface ProcessTreeContextType {
   fetchTreeData: (playbookId: string) => Promise<void>;
   setActiveItem: (id: string | null) => void;
   toggleProcessExpand: (processId: string) => void;
+  setExpandedProcesses: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
 const ProcessTreeContext = createContext<ProcessTreeContextType | undefined>(undefined);
@@ -45,7 +46,7 @@ export const ProcessTreeProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [expandedProcesses, setExpandedProcesses] = useState<Set<string>>(new Set());
 
-  const fetchTreeData = async (playbookId: string) => {
+  const fetchTreeData = useCallback(async (playbookId: string) => {
     if (!playbookId) {
       setProcesses([]);
       setNodes([]);
@@ -78,19 +79,19 @@ export const ProcessTreeProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setProcesses(processData);
       setNodes(nodeData);
       
-      // Automatically expand the first process if none are expanded
-      if (processData.length > 0 && expandedProcesses.size === 0) {
-        setExpandedProcesses(new Set([processData[0].id]));
-      }
+      // Removed: Automatically expand the first process if none are expanded
+      // if (processData.length > 0 && expandedProcesses.size === 0) {
+      //   setExpandedProcesses(new Set([processData[0].id]));
+      // }
     } catch (err) {
       console.error('Error fetching data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load process hierarchy');
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // Removed expandedProcesses.size from dependencies
 
-  const setActiveItem = (id: string | null) => {
+  const setActiveItem = useCallback((id: string | null) => {
     setActiveItemId(id);
     
     // If setting a node as active, ensure its parent process is expanded
@@ -104,9 +105,9 @@ export const ProcessTreeProvider: React.FC<{ children: React.ReactNode }> = ({ c
         });
       }
     }
-  };
+  }, [nodes]);
 
-  const toggleProcessExpand = (processId: string) => {
+  const toggleProcessExpand = useCallback((processId: string) => {
     setExpandedProcesses(prev => {
       const newSet = new Set(prev);
       if (newSet.has(processId)) {
@@ -116,7 +117,7 @@ export const ProcessTreeProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
       return newSet;
     });
-  };
+  }, []);
 
   return (
     <ProcessTreeContext.Provider value={{
@@ -128,7 +129,8 @@ export const ProcessTreeProvider: React.FC<{ children: React.ReactNode }> = ({ c
       expandedProcesses,
       fetchTreeData,
       setActiveItem,
-      toggleProcessExpand
+      toggleProcessExpand,
+      setExpandedProcesses
     }}>
       {children}
     </ProcessTreeContext.Provider>

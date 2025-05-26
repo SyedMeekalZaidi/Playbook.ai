@@ -101,6 +101,25 @@ export default function Dashboard() {
         fetchAllPlaybooks();
     }, [user]);
 
+    const refreshAllPlaybookData = async () => {
+        if (!user || !user.id) return;
+        setLoadingStates({ my: true, collaboration: true, implementor: true });
+        try {
+            const myData = await PlaybookAPI.getAll({ ownerId: user.id, isCopy: false });
+            setMyPlaybooks(myData || []);
+            const collabData = await PlaybookAPI.getCollaborationPlaybooks();
+            setCollaborationPlaybooks(collabData || []);
+            const implData = await PlaybookAPI.getImplementorPlaybooks();
+            setImplementorPlaybooks(implData || []);
+            setErrorStates({ my: null, collaboration: null, implementor: null });
+        } catch (error: any) {
+            console.error("Error refreshing playbook data:", error);
+            setErrorStates(prev => ({ ...prev, my: "Failed to refresh playbooks" }));
+        } finally {
+            setLoadingStates({ my: false, collaboration: false, implementor: false });
+        }
+    };
+
     if (!user) return (
         <Container className="py-4 px-4 flex-grow-1 text-center">
             <Spinner animation="border" style={{ color: '#FEC872' }} />
@@ -237,6 +256,7 @@ export default function Dashboard() {
                 setShareResults(responseData.results);
                 const allSuccessful = responseData.results.every(r => r.success);
                 if (allSuccessful && responseData.results.length > 0) {
+                    refreshAllPlaybookData();
                 } else {
                     const firstError = responseData.results.find(r => !r.success);
                     if (firstError) {
@@ -363,7 +383,7 @@ export default function Dashboard() {
 
     return (
         <>
-            <Container className="py-4 px-4 flex-grow-1">
+            <Container fluid className="py-4 px-4 flex-grow-1">
                 <div className="d-flex justify-content-between align-items-center mb-5">
                     <h1 className="text-3xl font-bold" style={{color: '#000000'}}> 
                         Welcome, {user?.email?.split('@')[0] || 'Admin'}
@@ -376,7 +396,6 @@ export default function Dashboard() {
                 {renderSection("My Playbooks", myPlaybooks, 'my', loadingStates.my, errorStates.my)}
                 {renderSection("Collaboration Playbooks", collaborationPlaybooks, 'collaboration', loadingStates.collaboration, errorStates.collaboration)}
                 {renderSection("Implemented Playbooks", implementorPlaybooks, 'implementor', loadingStates.implementor, errorStates.implementor)}
-
             </Container>
 
             <Modal show={showCreatePlaybookModal} onHide={handleClosePlaybookModal} centered>

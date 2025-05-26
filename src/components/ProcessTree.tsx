@@ -6,12 +6,14 @@ interface ProcessTreeProps {
   playbookId: string;
   onSelectProcess?: (processId: string) => void;
   onSelectNode?: (nodeId: string) => void;
+  refreshTrigger?: number; // Add refreshTrigger prop
 }
 
 const ProcessTree: React.FC<ProcessTreeProps> = ({ 
   playbookId, 
   onSelectProcess, 
-  onSelectNode 
+  onSelectNode,
+  refreshTrigger // Destructure refreshTrigger
 }) => {
   const { 
     processes,
@@ -22,14 +24,40 @@ const ProcessTree: React.FC<ProcessTreeProps> = ({
     expandedProcesses,
     fetchTreeData,
     setActiveItem,
-    toggleProcessExpand
+    toggleProcessExpand,
+    setExpandedProcesses
   } = useProcessTree();
 
   useEffect(() => {
     if (playbookId) {
-      fetchTreeData(playbookId);
+      fetchTreeData(playbookId).then(() => {
+        // This 'then' block will execute after fetchTreeData completes
+        // and processes/nodes state should be updated by then.
+        // However, direct access to 'processes' state here might still see the stale value
+        // from the closure of this useEffect.
+        // A better way is to check processes state in a separate effect or rely on its update.
+
+        // For now, let's assume fetchTreeData updates 'processes' and then we can react.
+        // This part is tricky due to state closure. A more robust way would be
+        // to have fetchTreeData return the data and set it here, or use another useEffect.
+
+        // Let's try a slightly different approach: check processes directly from context
+        // after the fetch. The context's 'processes' will be updated.
+        // This still might have a race condition if the component re-renders before
+        // the 'processes' state is fully updated and propagated.
+
+        // The most reliable way is to have fetchTreeData return the processData
+        // or to use a separate useEffect that watches the 'processes' array from context.
+      });
     }
-  }, [playbookId]);
+  }, [playbookId, fetchTreeData, refreshTrigger]);
+
+  // New useEffect to handle auto-expansion after processes are loaded
+  useEffect(() => {
+    if (processes.length > 0 && expandedProcesses.size === 0 && !loading && !error) {
+      setExpandedProcesses(new Set([processes[0].id]));
+    }
+  }, [processes, expandedProcesses.size, loading, error, setExpandedProcesses]);
 
   const buildProcessTree = () => {
     type TreeProcess = typeof processes[number] & {

@@ -20,10 +20,13 @@ interface User {
 }
 
 interface EnhancedSidebarProps {
-  defaultPlaybookId?: string;
+  currentPlaybookId: string;
   onSelectProcess?: (processId: string) => void;
   onSelectNode?: (nodeId: string) => void;
-  user: User; // must pass User as input
+  user: User;
+  refreshTrigger?: number;
+  onPlaybookChange?: (playbookId: string) => void; // Made optional
+  fetchMode?: 'mount-only' | 'default'; // New prop
 }
 
 // Helper to determine playbook type
@@ -49,18 +52,21 @@ function getDisplayName(playbook: any, type: string) {
 }
 
 const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
-  defaultPlaybookId,
+  currentPlaybookId,
   onSelectProcess,
   onSelectNode,
-  user
+  user,
+  refreshTrigger,
+  onPlaybookChange, // Now optional
+  fetchMode = 'default', // Default to 'default'
 }) => {
   const [playbooks, setPlaybooks] = useState<any[]>([]);
-  const [selectedPlaybookId, setSelectedPlaybookId] = useState<string>(defaultPlaybookId || '');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchPlaybooks = async () => {
+    // This effect is responsible for fetching the list of playbooks.
+    const fetchPlaybookList = async () => {
       setLoading(true);
       setError(null);
       try {
@@ -75,12 +81,10 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
         implementorPlaybooks = await PlaybookAPI.getImplementorPlaybooks();
         collaborationPlaybooks = await PlaybookAPI.getCollaborationPlaybooks();
 
-        // Tag each with a type
         const my = (myPlaybooks || []).map(pb => ({ ...pb, type: 'my' }));
         const impl = (implementorPlaybooks || []).map(pb => ({ ...pb, type: 'implementor' }));
         const collab = (collaborationPlaybooks || []).map(pb => ({ ...pb, type: 'collaboration' }));
 
-        // Remove duplicates (by id)
         const all = [...my, ...impl, ...collab];
         const uniqueMap = new Map();
         all.forEach(pb => {
@@ -88,18 +92,47 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
         });
         const merged = Array.from(uniqueMap.values());
         setPlaybooks(merged);
-        if (!selectedPlaybookId && merged.length > 0) {
-          setSelectedPlaybookId(merged[0].id);
-        }
       } catch (err: any) {
         console.error('Error fetching playbooks:', err);
         setError(err instanceof Error ? err.message : '[Sidebar] Failed to load playbooks');
+        setPlaybooks([]); // Clear playbooks on error
       } finally {
         setLoading(false);
       }
     };
-    fetchPlaybooks();
-  }, [user.id, user.role, selectedPlaybookId]);
+    fetchPlaybookList();
+  }, fetchMode === 'mount-only' ? [] : [user.id, user.role, refreshTrigger]); // Conditional dependency array
+
+  useEffect(() => {
+    // This effect ensures that if the parent's currentPlaybookId becomes invalid
+    // (e.g., not in the list of fetched playbooks), a new valid ID is proposed to the parent.
+    // Or if the parent has no ID selected and options are available, one is proposed.
+    if (loading) return; // Don't act while loading playbooks
+
+    // If onPlaybookChange is not provided, this effect cannot update parent state.
+    if (typeof onPlaybookChange !== 'function') {
+      if (playbooks.length > 0 && (!currentPlaybookId || !playbooks.some(pb => pb.id === currentPlaybookId))) {
+        // console.warn('[EnhancedSidebar] onPlaybookChange not provided. Cannot auto-select a default playbook.');
+      }
+      return;
+    }
+
+    const currentSelectionValidInList = playbooks.some(pb => pb.id === currentPlaybookId);
+
+    if (playbooks.length > 0) {
+      if (!currentPlaybookId || !currentSelectionValidInList) {
+        // If no current selection, or current selection is invalid, propose the first option.
+        if (currentPlaybookId !== playbooks[0].id) {
+          onPlaybookChange(playbooks[0].id);
+        }
+      }
+    } else {
+      // No playbooks available. If parent has a selection, propose clearing it.
+      if (currentPlaybookId !== '') {
+        onPlaybookChange('');
+      }
+    }
+  }, [currentPlaybookId, playbooks, onPlaybookChange, loading]);
 
   const playbookOptions = playbooks.map(playbook => {
     const type = getPlaybookType(playbook, user);
@@ -116,7 +149,7 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
     };
   });
 
-  const selectedOption = playbookOptions.find(opt => opt.value === selectedPlaybookId) || null;
+  const selectedOption = playbookOptions.find(opt => opt.value === currentPlaybookId) || null;
 
   return (
     <div className="sidebar-wrapper">
@@ -126,7 +159,15 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
           <Select
             options={playbookOptions}
             value={selectedOption}
-            onChange={opt => setSelectedPlaybookId(opt ? opt.value : '')}
+            onChange={opt => {
+              if (typeof onPlaybookChange === 'function') {
+                onPlaybookChange(opt ? opt.value : '');
+              } else {
+                // console.warn('[EnhancedSidebar] onPlaybookChange not provided. Selection change not propagated.');
+                // Optionally, if you want the Select to still update visually for local state (if you had one):
+                // setSelectedPlaybookId(opt ? opt.value : ''); 
+              }
+            }}
             isClearable={false}
             isSearchable={true}
             classNamePrefix="react-select"
@@ -146,12 +187,13 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({
         )}
       </div>
 
-      {selectedPlaybookId ? (
+      {currentPlaybookId ? (
         <ProcessTreeProvider>
           <ProcessTree
-            playbookId={selectedPlaybookId}
+            playbookId={currentPlaybookId}
             onSelectProcess={onSelectProcess}
             onSelectNode={onSelectNode}
+            refreshTrigger={refreshTrigger}
           />
         </ProcessTreeProvider>
       ) : (

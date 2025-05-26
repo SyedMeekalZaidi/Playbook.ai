@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { PlaybookAPI, ProcessAPI, NodeAPI } from '@/services/api'; // Import API services
-import { Playbook, Process } from '@/types/api'; // Import types
+import { Playbook, Process, User as AppUser } from '@/types/api'; // Import types
 import { DebugEntry } from './interfaces'; // Removed User import as DEFAULT_USER is removed
 import { createClient } from '@/lib/supabase'; // Use new browser client
 
@@ -27,6 +27,9 @@ export const useModeler = () => {
   const [isLoadingProcesses, setIsLoadingProcesses] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('new');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null); // Added currentUser state
+  const [sidebarRefreshNonce, setSidebarRefreshNonce] = useState<number>(0); // Added for sidebar refresh
+  const [isSavingDiagram, setIsSavingDiagram] = useState<boolean>(false); // New state for save operation
   const supabase = createClient();
 
   useEffect(() => {
@@ -35,9 +38,11 @@ export const useModeler = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
+        setCurrentUser({ id: user.id, email: user.email || '', role: 'USER' }); // Mock role as 'USER'
         fetchPlaybooks(user.id);
       } else {
         setCurrentUserId(null);
+        setCurrentUser(null); // Clear current user
         setPlaybooks([]); // Clear playbooks if no user
         setLoadError("Please log in to manage your playbooks.");
         setIsLoadingPlaybooks(false); // Ensure loading state is false
@@ -137,6 +142,7 @@ export const useModeler = () => {
         dbId: newProcess.id,
         details: `Created initial process in playbook: ${playbookId}`,
       });
+      setSidebarRefreshNonce(n => n + 1); // Refresh sidebar
     } catch (error) {
       console.error("Error creating process:", error);
       setLoadError("Failed to create process. Please check if the playbook exists.");
@@ -227,6 +233,7 @@ export const useModeler = () => {
         dbId: processId,
         details: `Deleted process from playbook: ${playbookId}`,
       });
+      setSidebarRefreshNonce(n => n + 1); // Refresh sidebar
     } catch (error) {
       console.error("Error deleting process:", error);
       setLoadError("Failed to delete process");
@@ -265,6 +272,7 @@ export const useModeler = () => {
           bpmnId: newNodeOrExisting.bpmnId,
           dbId: newNodeOrExisting.id,
         });
+        setSidebarRefreshNonce(n => n + 1); // Refresh sidebar
         return newNodeOrExisting;
       }
     } catch (error) {
@@ -335,6 +343,9 @@ export const useModeler = () => {
           bpmnId: updatedNode.bpmnId,
           dbId: updatedNode.id,
         });
+        if (!isSavingDiagram) { // Only refresh if not part of a save operation
+          setSidebarRefreshNonce(n => n + 1);
+        }
         return updatedNode;
       }
     } catch (error) {
@@ -362,6 +373,7 @@ export const useModeler = () => {
         bpmnId: 'N/A',
         dbId: data.id,
       });
+      setSidebarRefreshNonce(n => n + 1); // Refresh sidebar
       return { success: true };
     } catch (error) {
       console.error('Error deleting element:', error);
@@ -377,6 +389,8 @@ export const useModeler = () => {
       setShowSaveSuccess(false); // Ensure success message is hidden
       return;
     }
+
+    setIsSavingDiagram(true); // Set flag at the beginning of save
 
     try {
       await ProcessAPI.patch(processId, { bpmnXml: xml });
@@ -402,7 +416,6 @@ export const useModeler = () => {
 
         const promise = (async () => {
           let dbNode = null;
-          // Fetch fresh nodes list for each element to minimize staleness, though less efficient.
           const nodesInDb = await NodeAPI.getByProcess(processId); 
           dbNode = nodesInDb.find((n: any) => n.bpmnId === elementInfo.bpmnId);
 
@@ -414,7 +427,7 @@ export const useModeler = () => {
               bpmnId: elementInfo.bpmnId,
               shortDescription: elementInfo.shortDescription || null,
             };
-            await NodeAPI.update(payload); // This is line useModeler.tsx:415 from logs
+            await NodeAPI.update(payload);
             if (elementRegistry && modeling && elementInfo.bpmnId && dbNode.id) {
               const diagramElement = elementRegistry.get(elementInfo.bpmnId);
               if (diagramElement && diagramElement.businessObject.dbId !== dbNode.id) {
@@ -478,11 +491,14 @@ export const useModeler = () => {
       setSaveMessage(`Process "${processName}" saved successfully!`);
       setShowSaveSuccess(true);
       setTimeout(() => setShowSaveSuccess(false), 3000);
+      setSidebarRefreshNonce(n => n + 1); // Final explicit refresh
 
-    } catch (error) { // This is line useModeler.tsx:478 from logs
+    } catch (error) {
       console.error('Error saving diagram and syncing elements:', error);
       setLoadError('Failed to save diagram to database. Please check console for details.');
       setShowSaveSuccess(false); // Ensure success message is hidden on error
+    } finally {
+      setIsSavingDiagram(false); // Reset flag in finally block
     }
   };
 
@@ -526,5 +542,7 @@ export const useModeler = () => {
     handleElementDelete,
     handleSaveSuccess,
     currentUserId,
+    currentUser, // Return currentUser
+    sidebarRefreshNonce, // Return nonce
   };
 };
