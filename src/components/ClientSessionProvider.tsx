@@ -1,6 +1,11 @@
 'use client';
 
-import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
+/**
+ * ClientSessionProvider - Auth context provider
+ * Manages authentication state across the app
+ */
+
+import React, { createContext, useState, useEffect, useContext, useRef, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { User, Session } from '@supabase/supabase-js'; 
 import { createClient } from '@/lib/supabase';
@@ -31,19 +36,18 @@ export const useAuth = () => useContext(AuthContext);
 // List of routes that don't require authentication
 const publicRoutes = ['/login', '/signup', '/', '/about'];
 
-export function ClientSessionProvider({ children }: { children: React.ReactNode }) {
+// Inner provider that uses searchParams
+function ClientSessionProviderInner({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
-  // Flag to track if user just completed authentication
   const justAuthenticated = useRef(false);
   
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Use the new browser client
   const supabase = createClient();
 
   // Check if the current route is public
@@ -183,5 +187,18 @@ export function ClientSessionProvider({ children }: { children: React.ReactNode 
     <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
+  );
+}
+
+// Wrapper with Suspense boundary (Next.js 15 requirement for useSearchParams)
+export function ClientSessionProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-oxford-blue border-t-transparent" />
+      </div>
+    }>
+      <ClientSessionProviderInner>{children}</ClientSessionProviderInner>
+    </Suspense>
   );
 }

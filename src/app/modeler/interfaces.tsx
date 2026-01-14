@@ -16,13 +16,13 @@ export interface DebugEntry {
   export interface Process {
     id: string;
     name: string;
-    bpmnXml?: string;
-    bpmnId?: string;
+    bpmnXml?: string | null;
+    bpmnId?: string | null;
   }
   
   export interface User {
     id: string;
-    name: string;
-    email: string;
-    role: string;
+    name?: string;
+    email?: string;
+    role?: string;
   }

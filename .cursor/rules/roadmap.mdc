@@ -1,0 +1,151 @@
+---
+alwaysApply: true
+---
+
+# Technical Roadmap - DEMO COUNTDOWN ⏱️
+**Demo:** Wednesday 11am (~30 hours remaining)  
+**Working Hours Available:** ~6 hours  
+**Current Status:** Tuesday night
+
+---
+
+## ✅ Phase 0: Setup (COMPLETE)
+- Supabase + Prisma configured
+- Auth working, app deployed
+
+## ✅ Phase 1: UI/UX Overhaul (COMPLETE)
+- Shadcn/ui integrated with design system
+- Modern navbar, modals, cards
+- Debug panel hidden (Ctrl+Shift+D)
+- Macro sidebar (left) with flat process list
+- Micro sidebar (right) with documentation & parameters
+- Save & swap architecture (XML-first + background sync)
+
+---
+
+## 🔥 Phase 2: Polish & Core Features (Tuesday, 10h)
+
+### **PRIORITY 1: Fix UI & TypeScript Issues (2h) (Done)** 🔧
+**Status:** ⬜ Not started   (Done)
+- [ ] Fix any sidebar UI glitches (shimmer, transitions)
+- [ ] Fix all TypeScript compilation errors
+- [ ] Clean up console logs (remove test logs, keep errors only)
+- [ ] Verify save button states work correctly
+- [ ] **Demo Impact:** HIGH - professionalism, no errors during demo
+
+### **PRIORITY 2: Magic Map - AI Text to BPMN (6h)** ✨
+**Status:** ⬜ Not started  
+- [ ] Create `/api/generate-bpmn` route with OpenAI API
+- [ ] Build `MagicMapModal.tsx` component
+  - Textarea for process description
+  - 3 pre-filled example prompts (healthcare scenarios)
+  - Generate button with loading state
+  - Error handling UI
+- [ ] OpenAI prompt engineering:
+  - Input: Natural language process description
+  - Output: Valid BPMN 2.0 XML
+  - Handle: Start/End events, Tasks, Exclusive Gateways, Sequence Flows
+- [ ] Import generated XML into modeler
+- [ ] Auto-save with database sync
+- [ ] Error handling: Invalid XML, API timeout, fallback template
+- [ ] **Demo Impact:** VERY HIGH - the "wow factor" differentiator
+
+### **PRIORITY 3: Dashboard & Full Flow Polish (2h)** 🎨
+**Status:** ⬜ Not started  
+- [ ] Improve dashboard landing page (stats, recent playbooks)
+- [ ] Add smooth transitions between pages
+- [ ] Create demo data: 2 sample playbooks with processes
+- [ ] Test full user journey: Login → Dashboard → Playbook → Process → Edit → Save
+- [ ] **Demo Impact:** MEDIUM - first impressions matter
+
+---
+
+## 🎬 Phase 3: Demo Prep (Tuesday Evening/Wednesday Morning, 2h)
+
+### **Testing & Validation (1h)**
+- [ ] Test full workflow: Create playbook → Create process → Magic Map → Edit → Save → Reload
+- [ ] Test sidebars: Switch processes, edit documentation, add parameters
+- [ ] Verify no console errors (open DevTools during full flow)
+- [ ] Test on clean browser (incognito mode, no cached auth)
+- [ ] Test save & swap: rapid switching between processes
+
+### **Demo Setup (1h)**
+- [ ] Create demo account: `demo@monash.edu`
+- [ ] Create 2 sample playbooks:
+  1. **"NGO Health Screening"** (pre-built with 3 processes, shows polish)
+     - Process 1: Site Selection
+     - Process 2: Cervical Cancer Screening
+     - Process 3: Follow-up Care
+  2. **"My Playbook"** (empty, for live Magic Map demo)
+- [ ] Prepare 3 Magic Map prompts (saved in notepad):
+  - Simple: "Patient registration: Collect ID, check eligibility, assign number"
+  - Gateway: "Site suitability check: If accessible AND safe, set up clinic. Else, find new site"
+  - Complex: "Cervical cancer screening workflow with HPV test, visual inspection, and referral decision points"
+- [ ] Screenshot backup (in case live demo fails)
+- [ ] Write 5-minute demo script (what to say, what to click)
+- [ ] Practice run-through (2x minimum)
+
+---
+
+## 📦 OUT OF SCOPE (Post-Demo Features)
+
+**Implementation Mode** (20+ hours) - Show mockup/slides instead:
+- Execution workflow with checkboxes
+- Auto-navigation between nodes
+- Green/red audit trail coloring
+- Progress tracking
+- Explain: "Next phase would be implementation mode - users execute processes step-by-step"
+
+**Advanced Features** (mention as "future work"):
+- Process drag-to-reorder in sidebar
+- Sub-processes and nesting
+- AI-generated parameters (Magic Map v2)
+- Parameter validation logic (conditional flows)
+- Rich text editor enhancements
+- Real-time collaboration
+- Version history
+
+---
+
+## 🎯 Demo Success Criteria
+
+**Must Work Flawlessly:**
+1. ✅ Login → Dashboard → Shows playbooks
+2. ✅ Open playbook → Shows processes in sidebar
+3. ✅ Click process → Diagram renders with all nodes
+4. ✅ Click node → Right sidebar shows documentation & parameters
+5. ✅ **Magic Map:** Type text → Generate valid BPMN in <10s → Editable
+6. ✅ Edit diagram → Switch process → Original work saved
+7. ✅ Zero console errors, no layout shifts
+8. ✅ Smooth frost overlay during saves (1-2s acceptable)
+
+**Key Talking Points:**
+- "XML-first architecture ensures data integrity"
+- "Background sync optimizes UX - users don't wait for node metadata"
+- "Three-panel design: Playbook hierarchy (left) → Process visualization (center) → Node details (right)"
+- "Magic Map: Natural language → Production-ready BPMN in seconds"
+- "Built for low-literacy NGO workers - no technical BPMN knowledge required"
+
+---
+
+## 🚨 Known Issues (Acceptable for Demo)
+
+| Issue | Impact | Mitigation |
+|-------|--------|-----------|
+| 1-2s save latency | User waits with frost overlay | Network distance (Pakistan → Australia), acceptable on free tier |
+| Background sync ~5-10s | Silent, no user impact | Could optimize with bulk API calls post-demo |
+| Double effect triggers | Console noise only | Works correctly, just inefficient re-renders |
+
+---
+
+## ⏰ Time Allocation (12h remaining)
+
+| Task | Hours | Priority |
+|------|-------|----------|
+| Fix UI & TypeScript | 2h | P1 |
+| Magic Map | 6h | P1 |
+| Dashboard Polish | 2h | P2 |
+| Demo Prep & Testing | 2h | P1 |
+
+**Buffer:** None - must execute flawlessly
+**Fallback:** If Magic Map takes >8h, show mockup + explain architecture

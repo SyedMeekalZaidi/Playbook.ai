@@ -44,6 +44,7 @@ class DatabaseIntegration {
   // Track processed elements to prevent duplicate handling
   private processedElements: Set<string> = new Set();
   private isImporting: boolean = false; // Flag to indicate import operation
+  public get importing(): boolean { return this.isImporting; } // Public getter
 
   constructor(eventBus: any, elementRegistry: any, modeling: any) {
     this.eventBus = eventBus;
@@ -122,13 +123,11 @@ class DatabaseIntegration {
 
     this.eventBus.on('import.parse.start', () => {
       this.isImporting = true;
-      console.log('[DatabaseIntegration] import.parse.start: isImporting = true');
     });
 
     this.eventBus.on('import.done', (event: any) => {
-      console.log('[DatabaseIntegration] import.done event fired.');
       if (event.error) {
-        console.error('[DatabaseIntegration] Import failed:', event.error);
+        console.error('[SYNC-TEST] ❌ XML IMPORT FAILED:', event.error);
         this.isImporting = false; 
         this.processedElements.clear(); 
         return;
@@ -141,23 +140,19 @@ class DatabaseIntegration {
       allElements.forEach((element: any) => {
         this.processedElements.add(element.id);
       });
-      console.log('[DatabaseIntegration] import.done: processedElements repopulated after sync.', Array.from(this.processedElements));
       
       this.isImporting = false; 
-      console.log('[DatabaseIntegration] import.done: isImporting = false');
     });
   }
 
   // Set the process and node data from database
   public setDatabaseEntities(processes: Process[] = [], nodes: Node[] = []): void {
-    console.log("Setting database entities:", { processes, nodes });
     this.processes = processes;
     this.nodes = nodes;
   }
 
   // Set the current playbook and process context
   public setContext(playbookId: string | null, processId: string | null): void {
-    console.log("Setting context:", { playbookId, processId });
     this.currentPlaybookId = playbookId;
     this.currentProcessId = processId;
   }
@@ -172,34 +167,22 @@ class DatabaseIntegration {
   // Handle element creation
   private handleElementCreated(element: any): void {
     if (!element || !this.currentProcessId || !this.onElementCreate) {
-      console.log("Skipping element creation - missing dependencies", {
-        hasElement: !!element,
-        hasProcessId: !!this.currentProcessId,
-        hasCallback: !!this.onElementCreate
-      });
       return;
     }
 
     // Skip non-BPMN elements and elements that already have database IDs
     if (!this.isValidBpmnElement(element) || element.businessObject?.dbId) {
-      console.log("Skipping invalid element or already has dbId", {
-        isValid: this.isValidBpmnElement(element),
-        hasDbId: !!element.businessObject?.dbId
-      });
       return;
     }
 
     // Only store nodes, not connections
     if (!this.isStorableNode(element)) {
-      console.log("Skipping non-storable element (not a node):", element.type, element.id);
       return;
     }
 
     // Get element details
     const elementType = this.getBpmnElementType(element);
     const elementName = this.getElementName(element);
-
-    console.log(`Creating ${elementType} element: ${element.id} (${elementName})`);
 
     try {
       if (elementType === 'process') {
@@ -230,10 +213,16 @@ class DatabaseIntegration {
         }).then(result => {
           if (result && result.id) {
             this.setDatabaseId(element.id, result.id, 'node');
-            console.log(`[handleElementCreated] Set dbId for element ${element.id}: ${result.id}`);
+            // === SYNC-TEST: Node Created ===
+            console.log('[SYNC-TEST] ➕ NODE CREATED', {
+              bpmnId: element.id,
+              dbId: result.id,
+              name: elementName || this.getDefaultNameForElementType(elementType),
+              type: elementType
+            });
           }
         }).catch(err => {
-          console.error('Failed to create node in database:', err);
+          console.error('[SYNC-TEST] ❌ NODE CREATE FAILED:', { bpmnId: element.id, error: err.message });
         });
       }
     } catch (error) {
@@ -273,7 +262,6 @@ class DatabaseIntegration {
     }
 
     if (!currentDbId) {
-      console.log("[DatabaseIntegration] Skipping update for element without resolved DB ID:", element.id);
       return;
     }
     
@@ -294,10 +282,8 @@ class DatabaseIntegration {
           type: elementType, 
           shortDescription: shortDescription,
         }
-      }).then(() => {
-        console.log(`[DatabaseIntegration] Element ${element.id} (DB ID: ${currentDbId}) update processed by callback.`);
       }).catch(err => {
-        console.error(`[DatabaseIntegration] Failed to update element ${element.id} (DB ID: ${currentDbId}) in database:`, err);
+        console.error(`[SYNC-TEST] ❌ NODE UPDATE FAILED:`, { bpmnId: element.id, dbId: currentDbId, error: err.message });
       });
     }
   }
@@ -311,7 +297,6 @@ class DatabaseIntegration {
     }
 
     if (this.isImporting) {
-      console.log(`[DatabaseIntegration] Element ${elementId} removed during import, deferring DB deletion to save logic.`);
       this.processedElements.delete(elementId);
       return;
     }
@@ -323,7 +308,6 @@ class DatabaseIntegration {
 
     const dbInfo = this.getDatabaseInfo(element);
     if (!dbInfo || !dbInfo.id) {
-      console.log(`[DatabaseIntegration] Element ${elementId} removed from canvas, no DB info or not synced. No DB action.`);
       this.processedElements.delete(elementId);
       return;
     }
@@ -332,9 +316,13 @@ class DatabaseIntegration {
       id: dbInfo.id,
       type: element.businessObject?.dbType || (this.getBpmnElementType(element) === 'process' ? 'process' : 'node')
     }).then(() => {
-      console.log(`[DatabaseIntegration] Element ${elementId} (DB ID: ${dbInfo.id}) deletion processed by callback.`);
+      // === SYNC-TEST: Node Deleted (real-time) ===
+      console.log('[SYNC-TEST] 🗑️ NODE DELETED (real-time)', {
+        bpmnId: elementId,
+        dbId: dbInfo.id
+      });
     }).catch(err => {
-      console.error(`[DatabaseIntegration] Failed to process deletion for element ${elementId} (DB ID: ${dbInfo.id}):`, err);
+      console.error('[SYNC-TEST] ❌ NODE DELETE FAILED:', { bpmnId: elementId, dbId: dbInfo.id, error: err.message });
     });
     this.processedElements.delete(elementId);
   }
@@ -355,7 +343,6 @@ class DatabaseIntegration {
     try {
       const element = this.elementRegistry.get(elementId);
       if (!element) {
-        console.warn(`[DatabaseIntegration] Element ${elementId} not found in registry for setDatabaseId`);
         return false;
       }
 
@@ -364,10 +351,9 @@ class DatabaseIntegration {
         'dbType': type
       });
 
-      console.log(`[DatabaseIntegration] Database ID ${databaseId} (type: ${type}) set for element ${elementId}`);
       return true;
     } catch (error) {
-      console.error(`[DatabaseIntegration] Error setting database ID for ${elementId}:`, error);
+      console.error(`[SYNC-TEST] ❌ setDatabaseId FAILED for ${elementId}:`, error);
       return false;
     }
   }
@@ -466,12 +452,22 @@ class DatabaseIntegration {
       console.warn('[DatabaseIntegration] Element registry not available for sync.');
       return;
     }
-    console.log('[DatabaseIntegration] Starting syncDatabaseElements...');
+    
+    // === SYNC-TEST: Load Sync Start ===
     const allDiagramElements = this.elementRegistry.getAll();
+    const storableElements = allDiagramElements.filter((el: any) => this.isStorableNode(el));
+    console.log('[SYNC-TEST] 📥 LOAD SYNC START', {
+      dbNodesCount: this.nodes.length,
+      canvasNodesCount: storableElements.length,
+      dbNodes: this.nodes.map(n => ({ dbId: n.id, bpmnId: n.bpmnId, name: n.name }))
+    });
 
     const originalOnElementUpdate = this.onElementUpdate;
     this.onElementUpdate = null; // Temporarily disable onElementUpdate
 
+    // Track sync results for logging
+    const syncResults = { matched: 0, unmatched: 0, cleared: 0 };
+    
     try {
       allDiagramElements.forEach((element: any) => {
         if (!this.isValidBpmnElement(element)) {
@@ -499,21 +495,31 @@ class DatabaseIntegration {
           if (element.businessObject.dbId !== dbEntity.id || element.businessObject.dbType !== dbType) {
             this.setDatabaseId(bpmnId, dbEntity.id, dbType); 
           }
+          syncResults.matched++;
         } else {
           if (element.businessObject.dbId) {
-              console.warn(`[syncDatabaseElements] Element ${bpmnId} has a dbId (${element.businessObject.dbId}) but no matching entity in current DB data. Clearing its dbId.`);
+              syncResults.cleared++;
               this.modeling.updateProperties(element, {
                   'dbId': undefined,
                   'dbType': undefined
               });
+          } else {
+            syncResults.unmatched++;
           }
         }
       });
     } catch (error) {
-        console.error("[DatabaseIntegration] Error during syncDatabaseElements:", error);
+        console.error("[SYNC-TEST] ❌ LOAD SYNC ERROR:", error);
     } finally {
-        this.onElementUpdate = originalOnElementUpdate; // Restore onElementUpdate
-        console.log('[DatabaseIntegration] Finished syncDatabaseElements.');
+        this.onElementUpdate = originalOnElementUpdate;
+        
+        // === SYNC-TEST: Load Sync Complete ===
+        console.log('[SYNC-TEST] 📥 LOAD SYNC COMPLETE', {
+          matched: syncResults.matched,
+          unmatched: syncResults.unmatched,
+          cleared: syncResults.cleared,
+          status: syncResults.unmatched === 0 ? '✅ ALL MATCHED' : '⚠️ SOME UNMATCHED'
+        });
     }
   }
 

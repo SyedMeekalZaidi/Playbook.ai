@@ -52,13 +52,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         
         // Extract nodes from processes
         let fetchedNodes: Node[] = [];
-        fetchedProcesses.forEach(process => {
+        fetchedProcesses.forEach((process: any) => {
           if (process.nodes) {
             fetchedNodes = fetchedNodes.concat(process.nodes);
           }
         });
 
-        setProcesses(fetchedProcesses);
+        setProcesses(fetchedProcesses as any);
         setNodes(fetchedNodes);
       } catch (err) {
         console.error('Error fetching data:', err);

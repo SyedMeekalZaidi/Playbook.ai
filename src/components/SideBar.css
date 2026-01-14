@@ -1,54 +1,21 @@
+/**
+ * SideBar.css - Styles for process list sidebar
+ * Used by ProcessTree component in the modeler page
+ */
+
 /* Sidebar container */
 .sidebar {
   background-color: #FFFFFF;
   padding: 16px;
-  width: 100%;  /* Changed from fixed width to 100% */
-  min-width: 270px;  /* Added minimum width */
-  max-width: 350px;  /* Added maximum width */
+  width: 100%;
+  min-width: 270px;
+  max-width: 350px;
   border-radius: 16px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   overflow-y: auto;
-  font-family: 'Arial', sans-serif;
   border: 1px solid #E5E5E5;
   color: #000000;
-  height: calc(100vh - 160px); /* Fixed height for scrolling */
-}
-
-/* Playbook selector container */
-.playbook-selector {
-  margin-bottom: 10px;
-  padding: 16px;
-  background-color: #FFFFFF;
-  border-radius: 16px;
-  border: 1px solid #E5E5E5;
-}
-
-.playbook-selector label {
-  font-weight: bold;
-  color: #14213D;
-  margin-bottom: 8px;
-  display: block;
-}
-
-.playbook-selector select {
-  border: 1px solid #E5E5E5;
-  border-radius: 8px;
-  padding: 8px 12px;
-  width: 100%;
-  color: #000000;
-  background-color: #FFFFFF;
-  outline: none;
-  transition: border-color 0.2s ease;
-}
-
-.playbook-selector select:focus {
-  border-color: #FEC872;
-  box-shadow: 0 0 0 0.2rem rgba(254, 200, 114, 0.25);
-}
-
-.playbook-selector select:disabled {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
+  height: calc(100vh - 160px);
 }
 
 /* Header style */
@@ -70,39 +37,70 @@
   margin: 0;
 }
 
-/* Process list items */
+/* Process list items - flat list with icon */
 .sidebar-item {
-  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
   background-color: transparent;
   border-radius: 8px;
   transition: all 0.2s ease;
   cursor: pointer;
   font-size: 14px;
   color: #14213D;
-  position: relative;
   margin-bottom: 4px;
+  border-left: 3px solid transparent;
 }
 
-/* Active list item */
+/* Active process item */
 .sidebar-item.active {
-  background-color: rgba(254, 200, 114, 0.3);
-  font-weight: bold;
-  border-left: 4px solid #FEC872;
+  background-color: rgba(254, 200, 114, 0.25);
+  font-weight: 600;
+  border-left-color: #FEC872;
+}
+
+/* Loading process item - shine effect */
+.sidebar-item.loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar-item.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(254, 200, 114, 0.4),
+    transparent
+  );
+  animation: shine 1.2s infinite;
+}
+
+@keyframes shine {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
 }
 
 /* Hover effect */
 .sidebar-item:hover {
-  background-color: rgba(254, 200, 114, 0.15);
+  background-color: rgba(254, 200, 114, 0.12);
 }
 
-/* Collapsible section */
-.collapsible {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-weight: 500;
+.sidebar-item:hover:not(.active) {
+  border-left-color: rgba(254, 200, 114, 0.5);
 }
 
+/* Process name truncation */
 .item-name {
   flex-grow: 1;
   white-space: nowrap;
@@ -110,118 +108,15 @@
   text-overflow: ellipsis;
 }
 
-/* Nested list container */
-.nested-list {
-  list-style-type: none;
-  padding-left: 24px;
-  margin-top: 8px;
-  margin-bottom: 4px;
-}
-
-.nested-process-list {
-  list-style-type: none;
-  padding-left: 0;
-  margin-top: 4px;
-}
-
-/* Node list items */
-.node-item {
-  padding: 8px 12px;
-  font-size: 13px;
-  color: #000000;
-  position: relative;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.node-item:hover {
-  background-color: rgba(254, 200, 114, 0.2);
-}
-
-.node-item.active {
-  background-color: rgba(254, 200, 114, 0.4);
-  font-weight: bold;
-}
-
-/* Node icon */
-.node-icon {
-  display: inline-block;
-  margin-right: 8px;
-  width: 16px;
-  height: 16px;
-  text-align: center;
-}
-
-/* Node name */
-.node-name {
-  flex-grow: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Tree structure lines */
-.nested-list .node-item::before {
-  content: '';
-  position: absolute;
-  left: -16px;
-  top: 0;
-  width: 1px;
-  height: 100%;
-  background-color: #E5E5E5;
-}
-
-.nested-list .node-item::after {
-  content: '';
-  position: absolute;
-  left: -16px;
-  top: 50%;
-  width: 12px;
-  height: 1px;
-  background-color: #E5E5E5;
-}
-
-/* Expand/Collapse Icon */
-.expand-icon {
-  display: inline-block;
-  transition: transform 0.3s ease;
-  color: #FEC872;
-  font-size: 16px;
-  margin-left: 8px;
-}
-
-.expand-icon.collapsed {
-  transform: rotate(-90deg);
-}
-
-/* Loading and error states */
-.sidebar.loading, 
-.sidebar.error,
-.sidebar.no-playbook {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-  font-style: italic;
-  color: #666;
-}
-
-.sidebar.error {
-  color: #d32f2f;
-}
-
 /* Empty state */
 .empty-state {
   text-align: center;
   padding: 24px 16px;
-  color: #666;
-  font-style: italic;
+  color: #6B7280;
+  font-size: 14px;
 }
 
-/* Rounded border for overall sidebar */
+/* Sidebar wrapper */
 .sidebar-wrapper {
   border-radius: 16px;
   overflow: hidden;
@@ -249,11 +144,4 @@
     height: auto;
     max-height: 400px;
   }
-}
-
-.playbook-icon {
-  display: inline-block;
-  vertical-align: middle;
-  margin-right: 6px;
-  font-size: 1.1em;
 }

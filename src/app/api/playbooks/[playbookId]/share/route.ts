@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { handleApiError } from '@/lib/api-utils';
-import { PrismaClient, Role, Playbook as PrismaPlaybook, Process as PrismaProcess, Node as PrismaNode, ProcessParameter as PrismaProcessParameter, DocumentImage as PrismaDocumentImage } from '@prisma/client';
+import { PrismaClient, Role, Playbook as PrismaPlaybook } from '@prisma/client';
 import { createClient } from '@/utils/supabase/server';
 
 interface ShareRequestItem {
@@ -98,6 +98,7 @@ async function deepCopyPlaybook(
         id: crypto.randomUUID(),
         url: img.url, alt: img.alt, caption: img.caption,
         playbookId: copiedPlaybook.id,
+        updatedAt: new Date(),
       }))
     });
   }
@@ -123,6 +124,7 @@ async function deepCopyPlaybook(
           id: crypto.randomUUID(),
           url: img.url, alt: img.alt, caption: img.caption,
           processId: newProcessId,
+          updatedAt: new Date(),
         }))
       });
     }
@@ -154,6 +156,7 @@ async function deepCopyPlaybook(
             id: crypto.randomUUID(),
             url: img.url, alt: img.alt, caption: img.caption,
             nodeId: newNodeId,
+            updatedAt: new Date(),
           }))
         });
       }

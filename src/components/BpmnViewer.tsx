@@ -64,7 +64,8 @@ const BpmnViewerComponent = forwardRef<BpmnViewerRef, BpmnViewerProps>((props, r
     if (xml) {
       try {
         viewer.importXML(xml).then(() => {
-          viewer.get('canvas').zoom('fit-viewport');
+          const canvas = viewer.get('canvas') as { zoom: (option: string) => void };
+          canvas.zoom('fit-viewport');
           setLoaded(true);
         });
       } catch (err) {

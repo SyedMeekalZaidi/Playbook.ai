@@ -74,9 +74,9 @@ export default function NewEventPage() {
                 <Card key={node.id} className='mb-2'>
                     <Card.Body>
                         <Card.Title>{node.name}</Card.Title>
-                        {node.description ? <Card.Text>{node.description}</Card.Text> : null}
+                        {node.shortDescription ? <Card.Text>{node.shortDescription}</Card.Text> : null}
                         <hr />
-                        {renderParameters(node.ProcessParameter)}
+                        {renderParameters(node.ProcessParameter || [])}
                     </Card.Body>
                 </Card>
             ))
@@ -108,7 +108,7 @@ export default function NewEventPage() {
                     {param.type === "Dropdown" && (
                         <Form.Select>
                             <option value="">Select an option</option>
-                            {param.options.map((option) => (
+                            {(param.options || []).map((option) => (
                                 <option key={`${param.id}-${option}`} value="">{option}</option>
                             ))}
                         </Form.Select>

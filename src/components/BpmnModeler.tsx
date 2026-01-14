@@ -11,8 +11,8 @@ import DatabaseIntegrationModule from '../modules/DatabaseIntegration';
 interface Process {
   id: string;
   name: string;
-  bpmnXml?: string;
-  bpmnId?: string;
+  bpmnXml?: string | null;
+  bpmnId?: string | null;
 }
 
 interface Node {
@@ -41,6 +41,8 @@ interface BpmnModelerRef {
   getModeler: () => any;
   saveDiagram: () => Promise<void>;
   getSelectedElementInfo: () => { element: any; databaseInfo: any } | null;
+  getXml: () => Promise<string>;
+  getDiagramElements: () => any[];
 }
 
 const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props, ref) => {
@@ -64,6 +66,19 @@ const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [selectedElementDbInfo, setSelectedElementDbInfo] = useState<any>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  
+  // Refs for callbacks - ensures we always call the latest version (fixes stale closure bug)
+  const onSaveRef = useRef(onSave);
+  const onErrorRef = useRef(onError);
+  
+  // Keep refs in sync with props (runs on every render, but refs don't cause re-renders)
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
+  
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
   
   // Debug flag
   const [debug, setDebug] = useState(true);
@@ -153,20 +168,29 @@ const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props
     if (!modeler || !databaseIntegration || !processId) return;
     
     debugLog('Effect: Checking for existing BPMN diagram to load or create new.');
+    debugLog('[DEBUG LOAD] Effect triggered with:', { 
+      processId, 
+      processesCount: processes.length, 
+      nodesCount: nodes.length,
+      nodesArray: nodes.map(n => ({ id: n.id, bpmnId: n.bpmnId, name: n.name }))
+    });
     
     const process = processes.find(p => p.id === processId);
     
     if (process && process.bpmnXml && process.bpmnXml.trim() !== '') {
       debugLog('Effect: Loading existing BPMN diagram from XML', { processId, xmlLength: process.bpmnXml.length });
+      debugLog('[DEBUG LOAD] About to import XML. Nodes available:', nodes.length);
       
       modeler.importXML(process.bpmnXml)
         .then(() => {
           debugLog('Effect: Existing diagram loaded successfully');
+          debugLog('[DEBUG LOAD] XML imported. Nodes in state:', nodes.length);
           const canvas = modeler.get('canvas');
           canvas.zoom('fit-viewport');
           
           if (databaseIntegration) {
             debugLog('Effect: Syncing database elements with diagram after import');
+            debugLog('[DEBUG LOAD] Calling syncDatabaseElements with nodes.length:', nodes.length);
             if (typeof databaseIntegration.syncDatabaseElements === 'function') {
               databaseIntegration.syncDatabaseElements();
             } else {
@@ -206,7 +230,7 @@ const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props
     }
   };
   
-  // Save the diagram
+  // Save the diagram - uses refs to ensure latest callbacks are called
   const saveDiagram = async () => {
     if (!modeler || !databaseIntegration) {
       debugLog('Cannot save: modeler not initialized');
@@ -225,17 +249,19 @@ const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props
         mappingsCount: diagramElementsInfo.length
       });
       
-      if (onSave) {
-        await onSave(xml, diagramElementsInfo);
+      // Use ref to call latest onSave callback (fixes stale closure bug)
+      if (onSaveRef.current) {
+        await onSaveRef.current(xml, diagramElementsInfo);
       }
       
       return xml;
     } catch (err: any) {
       console.error('Error saving diagram in BpmnModelerComponent:', err);
-      if (onError) {
-        onError(`Failed to save diagram: ${err.message || 'Unknown error'}`);
+      // Use ref to call latest onError callback
+      if (onErrorRef.current) {
+        onErrorRef.current(`Failed to save diagram: ${err.message || 'Unknown error'}`);
       }
-      throw err; // Re-throw the error so the caller knows the save failed
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -251,12 +277,31 @@ const BpmnModelerComponent = forwardRef<BpmnModelerRef, BpmnModelerProps>((props
     };
   };
   
+  // Get XML only (for quick saves during process switching)
+  const getXml = async (): Promise<string> => {
+    if (!modeler) {
+      throw new Error('Modeler not initialized');
+    }
+    const { xml } = await modeler.saveXML({ format: true });
+    return xml;
+  };
+  
+  // Get diagram elements info (for background sync)
+  const getDiagramElements = () => {
+    if (!databaseIntegration) {
+      return [];
+    }
+    return databaseIntegration.getDiagramElementsInfo();
+  };
+  
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
     getModeler: () => modeler,
     saveDiagram,
-    getSelectedElementInfo
-  }), [modeler, selectedElement, selectedElementDbInfo]);
+    getSelectedElementInfo,
+    getXml,
+    getDiagramElements,
+  }), [modeler, databaseIntegration, selectedElement, selectedElementDbInfo]);
   
   return (
     <div className="bpmn-modeler-container" style={{ width: '100%', height: '100%', position: 'relative' }}>

@@ -9,10 +9,12 @@ export { PrismaClientRole as Role };
 export interface User {
   id: string;
   email?: string;
+  role?: string;
 }
 
 export interface Playbook extends PrismaPlaybook {
   sourcePlaybook?: { name: string } | null;
+  Process?: Process[]; // Included when fetching with includeProcess option
 }
 
 export interface ImplementorPlaybook extends Playbook {
@@ -29,6 +31,7 @@ export interface Process {
   createdAt: string;
   updatedAt: string;
   Node?: Node[];
+  nodes?: Node[]; // Alias for Node (API may return either)
   ProcessParameter?: ProcessParameter[];
   parentToProcesses?: ProcessDependency[];
   nextToProcesses?: ProcessDependency[];
@@ -39,6 +42,7 @@ export interface Node {
   name: string;
   type: string;
   shortDescription?: string | null;
+  description?: string | null; // Alias for shortDescription
   processId: string;
   bpmnId?: string | null;
   documentContent?: any | null;
@@ -82,7 +86,7 @@ export interface CreatePlaybookPayload {
   shortDescription?: string;
 }
 
-export interface UpdatePlaybookPutPayload extends CreatePlaybookPayload {
+export interface UpdatePlaybookPutPayload extends Omit<CreatePlaybookPayload, 'shortDescription'> {
   shortDescription?: string | null;
   documentContent?: any | null;
   status?: Status;
@@ -123,6 +127,7 @@ export interface GetPlaybookByIdOptions {
   includeProcess?: boolean;
   includeNodes?: boolean;
   includeNodeParams?: boolean;
+  includeAll?: boolean; // Shorthand for including all relations
 }
 
 export interface CreateProcessPayload {
@@ -148,10 +153,11 @@ export type UpdateProcessPatchPayload = Partial<UpdateProcessPutPayload>;
 export interface CreateNodePayload {
   name: string;
   type: string;
-  processId: string;
+  processId?: string; // Optional when creating nodes as part of process creation
   shortDescription?: string | null;
   bpmnId?: string | null;
   documentContent?: any | null;
+  parameters?: CreateProcessParameterPayload[]; // Parameters for the node
 }
 
 export interface UpdateNodePayload {

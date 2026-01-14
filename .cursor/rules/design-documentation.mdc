@@ -1,0 +1,205 @@
+---
+alwaysApply: true
+---
+
+# ROSE Playbook Design System (2026)
+
+Modern, professional SaaS aesthetic with layered depth and restraint.
+
+## Design Principles
+1. **Restraint** - Brand colors accent, don't dominate
+2. **Layered Depth** - Soft backgrounds with elevated white cards
+3. **Consistency** - Same spacing, shadows, radii everywhere
+4. **Stability** - Fixed modal sizes, no layout shifts
+
+---
+
+## Color System
+
+### Philosophy
+Use brand colors (Oxford Blue, Gold) **sparingly** on soft backgrounds. They should POP, not overwhelm.
+
+### Brand Colors
+| Color | Hex | CSS Variable | Usage |
+|-------|-----|--------------|-------|
+| Oxford Blue | `#14213D` | `text-oxford-blue` | Headings, primary buttons, important text |
+| Gold | `#FEC872` | `text-gold` | Accents, highlights, CTAs, hover states |
+| Gold Light | `#FFE0A3` | `bg-gold-300` | Soft backgrounds, badges |
+
+### Background Layers
+| Color | Hex | CSS Class | Usage |
+|-------|-----|-----------|-------|
+| Page Background | `#F8F7F5` | `bg-background` | Main page background |
+| Surface | `#FFFFFF` | `bg-card` | Cards, modals, elevated elements |
+| Surface Muted | `#F3F2F0` | `bg-surface-muted` | Sidebar, secondary areas |
+
+### Text Colors
+| Color | Hex | CSS Class | Usage |
+|-------|-----|-----------|-------|
+| Foreground | `#14213D` | `text-foreground` | Primary text |
+| Muted | `#6B7280` | `text-muted-foreground` | Secondary text, descriptions |
+
+---
+
+## Typography System
+
+### Heading Classes (in `globals.css`)
+| Class | Styles | Usage |
+|-------|--------|-------|
+| `heading-1` | `text-3xl font-bold text-oxford-blue tracking-tight` | Page titles |
+| `heading-2` | `text-xl font-semibold text-oxford-blue` | Section headings |
+| `heading-3` | `text-lg font-medium text-foreground` | Card titles |
+
+### Body Text Classes
+| Class | Styles | Usage |
+|-------|--------|-------|
+| `body-default` | `text-base text-foreground leading-relaxed` | Main content |
+| `body-muted` | `text-sm text-muted-foreground` | Secondary text |
+| `body-small` | `text-xs text-muted-foreground` | Fine print |
+
+### Text Highlights (for emphasis)
+| Class | Effect | Usage |
+|-------|--------|-------|
+| `text-highlight` | Gold underline pseudo-element | Feature names (e.g., "Magic Map") |
+| `text-highlight-bg` | Gold background pill | Inline emphasis |
+| `text-accent` | Gold text, semibold | Inline accent |
+
+---
+
+## Spacing System
+
+### Layout Utilities (in `globals.css`)
+| Class | Styles | Usage |
+|-------|--------|-------|
+| `page-wrapper` | `px-4 py-6 md:px-6 md:py-8 max-w-7xl mx-auto` | Page container |
+| `section` | `mb-8` | Section spacing |
+| `section-header` | `flex items-center justify-between gap-4 mb-6` | Section header |
+| `section-title` | Gold-underlined heading | Section titles |
+| `card-grid` | `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6` | Card layouts |
+
+### Standard Spacing
+- Page container: `px-4 py-6 md:px-6 md:py-8`
+- Section gaps: `mb-8`
+- Card grid: `gap-6`
+- Card padding: `p-6`
+
+---
+
+## Component Patterns
+
+### Cards (Shadcn `Card`)
+
+**Variants:**
+| Variant | Usage |
+|---------|-------|
+| `default` | Standard elevated card |
+| `elevated` | More prominent shadow |
+| `outline` | Bordered, no shadow |
+| `ghost` | Minimal, for empty states |
+| `accent` | Gold top border accent |
+
+```jsx
+// Standard card
+<Card className="h-full">
+
+// Accent card (for playbook/process items)
+<Card variant="accent" className="hover:-translate-y-1 transition-transform">
+
+// Empty state
+<Card variant="ghost" className="bg-muted/30">
+```
+
+### Modals (Shadcn `Dialog`)
+
+**Fixed Sizes - NEVER Resize:**
+| Size | Width | Use Case |
+|------|-------|----------|
+| `sm` | 400px | Confirmations, simple forms |
+| `md` | 560px | Standard forms, settings |
+| `lg` | 720px | Complex content, collaborators |
+
+```jsx
+<Dialog open={open} onOpenChange={setOpen}>
+  <DialogContent size="md">
+    <DialogHeader>
+      <DialogTitle>Title</DialogTitle>
+    </DialogHeader>
+    <DialogBody> {/* Scrollable content area */}
+      {/* Content here */}
+    </DialogBody>
+    <DialogFooter>
+      <Button>Action</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+```
+
+### Buttons
+
+```jsx
+// Primary (Oxford Blue)
+<Button className="bg-oxford-blue hover:bg-oxford-blue/90">
+
+// Accent (Gold)  
+<Button className="bg-gold text-oxford-blue hover:bg-gold/90">
+
+// Outline
+<Button variant="outline" className="border-oxford-blue text-oxford-blue">
+
+// Destructive
+<Button variant="outline" className="text-destructive border-destructive">
+```
+
+---
+
+## Shadows
+
+| Class | Usage |
+|-------|-------|
+| `shadow-card` | Default card elevation |
+| `shadow-card-hover` | Hover state for cards |
+| `shadow-elevated` | Prominent elements |
+| `shadow-md` | Standard (Tailwind) |
+| `shadow-lg` | Hover states (Tailwind) |
+
+---
+
+## Quick Reference
+
+### Page Structure
+```jsx
+<div className="min-h-screen bg-background">
+  <div className="page-wrapper">
+    {/* Header */}
+    <div className="section-header mb-8">
+      <h1 className="heading-1">Page Title</h1>
+      <Button>Action</Button>
+    </div>
+
+    {/* Section */}
+    <section className="section">
+      <h2 className="section-title mb-6">Section Title</h2>
+      <div className="card-grid">
+        <Card variant="accent">...</Card>
+      </div>
+    </section>
+  </div>
+</div>
+```
+
+### Card Item Pattern
+```jsx
+<Card variant="accent" className="h-full hover:-translate-y-1 transition-transform cursor-pointer group">
+  <CardHeader className="pb-2">
+    <div className="flex justify-between items-center">
+      <CardTitle className="heading-3 line-clamp-1">{title}</CardTitle>
+      <ArrowRight className="h-4 w-4 text-gold group-hover:translate-x-1 transition-transform" />
+    </div>
+  </CardHeader>
+  <CardContent>
+    <CardDescription className="body-muted line-clamp-2">
+      {description}
+    </CardDescription>
+  </CardContent>
+</Card>
+```

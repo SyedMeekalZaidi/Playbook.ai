@@ -1,30 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+/**
+ * Login Page - Modern split-panel authentication with brand storytelling
+ * Features AuthLayout with BrandStoryPanel + clean form design
+ */
+
+import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Card, Form, Button, Container, Row, Col, Alert } from 'react-bootstrap';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 import { createBrowserClient } from '@supabase/ssr';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AuthLayout } from '@/components/auth/AuthLayout';
+import { BrandStoryPanel } from '@/components/auth/BrandStoryPanel';
 
-export default function Login() {
+function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
-    type: 'success' | 'error' | 'info' | 'warning' | '';
+    type: 'success' | 'error' | 'info' | '';
     message: string;
   }>({ type: '', message: '' });
   const [passwordVisible, setPasswordVisible] = useState(false);
   
   const searchParams = useSearchParams();
-  // Get the redirect path from URL params or default to dashboard
   const redirectTo = searchParams.get('redirectTo') || '/dashboard';
   
-  // Create a Supabase client specifically for this component
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -48,12 +55,9 @@ export default function Login() {
           errorMsg.toLowerCase().includes('email confirmation required') ||
           errorMsg.toLowerCase().includes('user has not confirmed')
         ) {
-          errorMsg = 'You need to confirm your email before logging in. Please check your inbox for a confirmation email.';
+          errorMsg = 'Please confirm your email before logging in. Check your inbox for a confirmation link.';
         }
-        setStatusMessage({
-          type: 'error',
-          message: errorMsg
-        });
+        setStatusMessage({ type: 'error', message: errorMsg });
         setIsLoading(false);
         return;
       }
@@ -61,10 +65,8 @@ export default function Login() {
       if (data?.user) {
         setStatusMessage({
           type: 'success',
-          message: 'Login successful! Redirecting to dashboard...'
+          message: 'Login successful! Redirecting...'
         });
-        
-        // Do a hard navigation to ensure the session is picked up
         window.location.href = redirectTo;
       }
     } catch (error: any) {
@@ -76,127 +78,161 @@ export default function Login() {
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setPasswordVisible(!passwordVisible);
-  };
-
   return (
-    <Container fluid className="py-5 min-vh-100 d-flex align-items-center justify-content-center bg-light">
-      <Row className="w-100 justify-content-center my-4">
-        <Col xs={12} md={8} lg={6} xl={4}>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+    <AuthLayout>
+      <BrandStoryPanel />
+      
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="w-full"
+      >
+        {/* Header */}
+        <div className="text-center mb-8">
+          {/* Mobile logo (hidden on desktop where BrandStoryPanel shows) */}
+          <motion.div 
+            className="flex justify-center mb-6 lg:hidden"
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
           >
-            <Card className="shadow-lg border-0 rounded-lg overflow-hidden">
-              <Card.Header className="text-center bg-primary text-white p-4">
-                <div className="d-flex justify-content-center mb-2">
-                  <Image
-                    src="/rose-logo.png"
-                    alt="ROSE Logo"
-                    width={60}
-                    height={60}
-                    className="rounded-circle bg-blue-900 p-2"
-                    priority
-                  />
-                </div>
-                <h2 className="font-weight-bold mb-0">Welcome Back</h2>
-                <p className="text-white-50 mb-0">Log in to your account</p>
-              </Card.Header>
-              
-              <Card.Body className="p-4 p-lg-5">
-                {statusMessage.type && (
-                  <Alert variant={statusMessage.type} className="mb-4">
-                    {statusMessage.message}
-                  </Alert>
-                )}
-                
-                <Form onSubmit={handleLogin}>
-                  <Form.Group className="mb-4">
-                    <Form.Label className="fw-bold">Email address</Form.Label>
-                    <div className="input-group">
-                      <span className="input-group-text bg-light">
-                        <i className="bi bi-envelope"></i>
-                      </span>
-                      <Form.Control
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="name@example.com"
-                        required
-                        className="py-2"
-                      />
-                    </div>
-                  </Form.Group>
-                  
-                  <Form.Group className="mb-4">
-                    <Form.Label className="d-flex justify-content-between">
-                      <span className="fw-bold">Password</span>
-                      <Link 
-                        href="/forgot-password"
-                        className="text-decoration-none text-primary"
-                      >
-                        Forgot password?
-                      </Link>
-                    </Form.Label>
-                    <div className="input-group">
-                      <span className="input-group-text bg-light">
-                        <i className="bi bi-lock"></i>
-                      </span>
-                      <Form.Control
-                        type={passwordVisible ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter your password"
-                        required
-                        className="py-2"
-                      />
-                      <Button 
-                        variant="outline-secondary"
-                        onClick={togglePasswordVisibility}
-                        type="button"
-                      >
-                        <i className={`bi ${passwordVisible ? 'bi-eye-slash' : 'bi-eye'}`}></i>
-                      </Button>
-                    </div>
-                  </Form.Group>
-                  
-                  <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Button 
-                      variant="primary" 
-                      type="submit" 
-                      className="w-100 py-2 mt-4 mb-3"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                          Logging in...
-                        </>
-                      ) : 'Log In'}
-                    </Button>
-                  </motion.div>
-                </Form>
-              </Card.Body>
-              
-              <Card.Footer className="bg-white text-center py-4 border-0">
-                <p className="mb-0">
-                  Don't have an account?{' '}
-                  <motion.span whileHover={{ scale: 1.05 }}>
-                    <Link href="/signup" className="text-primary fw-bold text-decoration-none">
-                      Sign Up
-                    </Link>
-                  </motion.span>
-                </p>
-              </Card.Footer>
-            </Card>
+            <div className="bg-oxford-blue/10 rounded-full p-3">
+              <Image
+                src="/rose-logo.png"
+                alt="Playbook.ai Logo"
+                width={48}
+                height={48}
+                className="object-contain"
+                priority
+              />
+            </div>
           </motion.div>
-        </Col>
-      </Row>
-    </Container>
+
+          <h1 className="text-3xl font-bold text-oxford-blue mb-2">Welcome Back</h1>
+          <p className="text-muted-foreground">
+            Sign in to your Playbook.ai account
+          </p>
+        </div>
+
+        {/* Form */}
+        <div className="space-y-4">
+          {statusMessage.type && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4"
+            >
+              <Alert variant={statusMessage.type === 'error' ? 'destructive' : 'default'}
+                className={statusMessage.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : ''}
+              >
+                {statusMessage.type === 'error' && <AlertCircle className="h-4 w-4" />}
+                {statusMessage.type === 'success' && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                {statusMessage.type === 'info' && <Loader2 className="h-4 w-4 animate-spin" />}
+                <AlertDescription>{statusMessage.message}</AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            {/* Email Field */}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email address</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  required
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password">Password</Label>
+                <Link 
+                  href="/forgot-password"
+                  className="text-sm text-oxford-blue hover:text-gold transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type={passwordVisible ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  className="pl-10 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPasswordVisible(!passwordVisible)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <motion.div
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+            >
+              <Button 
+                type="submit" 
+                className="w-full bg-oxford-blue hover:bg-oxford-blue/90 mt-2"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Logging in...
+                  </>
+                ) : (
+                  'Log In'
+                )}
+              </Button>
+            </motion.div>
+          </form>
+
+          {/* Footer */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Don't have an account?{' '}
+              <Link 
+                href="/signup" 
+                className="font-semibold text-oxford-blue hover:text-gold transition-colors"
+              >
+                Sign Up
+              </Link>
+            </p>
+          </div>
+        </div>
+      </motion.div>
+    </AuthLayout>
+  );
+}
+
+// Wrap with Suspense for useSearchParams (Next.js 15 requirement)
+export default function Login() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-oxford-blue border-t-transparent" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -2,55 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Define color variables */
-:root {
-  /* Color System */
-  --oxford-blue: #14213D;
-  --gold: #FEC872;
-  --gold-light: #FFE0A3;
-  --black: #000000;
-  --grey: #E5E5E5;
-  --white: #FFFFFF;
-  
-  /* Functional Colors */
-  --background: var(--white);
-  --foreground: var(--black);
-  --primary: var(--oxford-blue);
-  --primary-hover: #1d2d4d;
-  --accent: var(--gold);
-  --accent-hover: #ffb649;
-  --accent-light: var(--gold-light);
-  --text-primary: var(--black);
-  --text-secondary: var(--grey);
-  --text-on-primary: var(--white);
-  --text-on-accent: var(--black);
-
-  /* Layout variables */
-  --navbar-height: 4rem; /* Define navbar height as a variable for consistency */
+/* 
+ * CRITICAL FIX: Prevent layout shift from Radix modals/dropdowns
+ * Force scrollbar to always be visible and prevent any width changes
+ */
+html {
+  overflow-y: scroll !important;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #1A1A1A;
-    --foreground: var(--white);
-    --primary: #192b4a;
-    --primary-hover: #253959;
-    --accent: #eab456;
-    --accent-hover: #d9a037;
-    --accent-light: #f0c685;
-    --text-primary: var(--white);
-    --text-secondary: #B8B8B8;
-  }
+/* Custom Scrollbar - Golden theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #E8D5A8 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #E8D5A8;
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #FEC872;
+}
+
+/* Override ALL Radix scroll lock attempts */
+body[data-scroll-locked],
+body[style*="overflow"],
+body[style*="padding-right"] {
+  overflow: visible !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* Ensure body width never changes */
+body {
+  overflow-x: hidden !important;
+  width: 100% !important;
+}
+
+/* Layout variables - keep for navbar positioning */
+:root {
+  --navbar-height: 4rem;
 }
 
 body {
-  background: var(--background);
-  color: var(--text-primary);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding-top: var(--navbar-height); /* Add padding to body equal to navbar height */
+  /* Note: padding-top moved to @layer base to prevent Tailwind override */
 }
 
 /* Additional styles for auth container */
@@ -71,10 +80,10 @@ body {
   }
 }
 
-/* Update main content top margin to use the variable */
-main {
-  margin-top: var(--navbar-height);
-}
+/* 
+ * Note: Body already has padding-top for fixed navbar.
+ * Don't add margin-top to main - it causes double offset.
+ */
 
 /* Fix for mobile view to ensure content doesn't get hidden behind the navbar */
 @media (max-width: 768px) {
@@ -87,4 +96,372 @@ main {
 .page-container {
   padding-top: calc(var(--navbar-height) + 1rem);
   min-height: 100vh;
+}
+
+@layer base {
+  :root {
+    /* 
+     * Modern Design System: Oxford Blue (#14213D) + Gold (#FEC872)
+     * Updated 2026: Soft backgrounds with layered depth
+     */
+    
+    /* Background layers - darker for better contrast with cards */
+    --background: 40 20% 95%; /* #F3F2ED - slightly darker warm gray */
+    --foreground: 222 50% 16%; /* Oxford Blue for text */
+    
+    /* Surface colors for cards and elevated elements */
+    --surface: 0 0% 100%; /* Pure white for cards */
+    --surface-muted: 40 14% 95%; /* #F3F2F0 - sidebar, secondary areas */
+    
+    /* Card system */
+    --card: 0 0% 100%; /* White cards */
+    --card-foreground: 222 50% 16%;
+    
+    /* Popover/dropdown */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 50% 16%;
+    
+    /* Primary: Oxford Blue */
+    --primary: 222 50% 16%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary: Gold */
+    --secondary: 40 98% 72%;
+    --secondary-foreground: 222 50% 16%;
+    
+    /* Muted elements */
+    --muted: 40 14% 95%;
+    --muted-foreground: 220 9% 46%; /* #6B7280 - readable gray */
+    
+    /* Accent: Gold */
+    --accent: 40 98% 72%;
+    --accent-foreground: 222 50% 16%;
+    
+    /* Semantic colors */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    
+    /* Borders & inputs - subtle */
+    --border: 40 10% 90%;
+    --input: 40 10% 90%;
+    --ring: 222 50% 16%;
+    
+    /* Chart colors */
+    --chart-1: 40 98% 72%;
+    --chart-2: 222 50% 16%;
+    --chart-3: 40 98% 82%;
+    --chart-4: 222 50% 26%;
+    --chart-5: 40 70% 60%;
+    
+    /* Spacing & sizing */
+    --radius: 0.625rem;
+  }
+  .dark {
+    /* Dark mode - keeping for future use */
+    --background: 222 50% 10%;
+    --foreground: 0 0% 98%;
+    --surface: 222 50% 12%;
+    --surface-muted: 222 50% 14%;
+    --card: 222 50% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 222 50% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 40 98% 72%; /* Gold in dark mode */
+    --primary-foreground: 222 50% 16%;
+    --secondary: 222 50% 20%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 222 50% 18%;
+    --muted-foreground: 220 9% 65%;
+    --accent: 40 98% 65%;
+    --accent-foreground: 222 50% 16%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 76% 46%;
+    --success-foreground: 0 0% 100%;
+    --border: 222 50% 20%;
+    --input: 222 50% 20%;
+    --ring: 40 98% 72%;
+    --chart-1: 40 98% 72%;
+    --chart-2: 222 50% 40%;
+    --chart-3: 40 98% 60%;
+    --chart-4: 222 50% 50%;
+    --chart-5: 40 70% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    padding-top: var(--navbar-height) !important;
+  }
+}
+
+/* ============================================
+ * Typography System
+ * Consistent text hierarchy throughout the app
+ * ============================================ */
+
+@layer components {
+  /* Headings - Oxford Blue for emphasis */
+  .heading-1 {
+    @apply text-3xl font-bold text-oxford-blue tracking-tight;
+  }
+  
+  .heading-2 {
+    @apply text-xl font-semibold text-oxford-blue;
+  }
+  
+  .heading-3 {
+    @apply text-lg font-medium text-foreground;
+  }
+  
+  /* Body text */
+  .body-default {
+    @apply text-base text-foreground leading-relaxed;
+  }
+  
+  .body-muted {
+    @apply text-sm text-muted-foreground;
+  }
+  
+  .body-small {
+    @apply text-xs text-muted-foreground;
+  }
+
+  /* Gold highlight for emphasis (e.g., "Magic Map") */
+  .text-highlight {
+    @apply relative inline-block;
+  }
+  
+  .text-highlight::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-full h-[0.35em] bg-gold/40 -z-10 rounded-sm;
+  }
+  
+  /* Alternative: Gold background highlight */
+  .text-highlight-bg {
+    @apply bg-gold/20 px-1.5 py-0.5 rounded text-oxford-blue font-medium;
+  }
+  
+  /* Gold text for inline emphasis */
+  .text-accent {
+    @apply text-gold font-semibold;
+  }
+}
+
+/* ============================================
+ * Spacing & Layout Utilities
+ * Consistent spacing throughout the app
+ * ============================================ */
+
+@layer components {
+  /* Page container - standard padding */
+  .page-wrapper {
+    @apply px-4 py-6 md:px-6 md:py-8 max-w-7xl mx-auto;
+  }
+  
+  /* Section spacing */
+  .section {
+    @apply mb-8;
+  }
+  
+  .section-header {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6;
+  }
+  
+  .section-title {
+    @apply text-xl font-semibold text-oxford-blue pb-2 border-b-2 border-gold inline-block;
+  }
+  
+  /* Card grid layout */
+  .card-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+  }
+  
+  /* Content area with sidebar */
+  .content-with-sidebar {
+    @apply flex flex-col lg:flex-row gap-6;
+  }
+  
+  .sidebar {
+    @apply w-full lg:w-72 shrink-0;
+  }
+  
+  .main-content {
+    @apply flex-1 min-w-0;
+  }
+}
+
+/* ========================================
+   Tiptap Editor Styles
+   ======================================== */
+
+/* Editor container */
+.tiptap-editor {
+  @apply rounded-lg border border-border bg-white overflow-hidden;
+}
+
+/* Editor content area */
+.tiptap-editor-content {
+  @apply p-3 min-h-[100px];
+}
+
+.tiptap-editor-content:focus {
+  @apply outline-none;
+}
+
+/* Placeholder text */
+.tiptap-editor-content.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply text-muted-foreground pointer-events-none float-left h-0;
+}
+
+/* Prose styling for both editor and viewer */
+.tiptap-editor-content,
+.tiptap-content {
+  @apply text-sm text-foreground;
+}
+
+.tiptap-editor-content p,
+.tiptap-content p {
+  @apply mb-3 last:mb-0;
+}
+
+.tiptap-editor-content h1,
+.tiptap-content h1 {
+  @apply text-xl font-bold text-oxford-blue mb-3 mt-4 first:mt-0;
+}
+
+.tiptap-editor-content h2,
+.tiptap-content h2 {
+  @apply text-lg font-semibold text-oxford-blue mb-2 mt-3 first:mt-0;
+}
+
+.tiptap-editor-content h3,
+.tiptap-content h3 {
+  @apply text-base font-medium text-oxford-blue mb-2 mt-3 first:mt-0;
+}
+
+.tiptap-editor-content strong,
+.tiptap-content strong {
+  @apply font-semibold;
+}
+
+.tiptap-editor-content em,
+.tiptap-content em {
+  @apply italic;
+}
+
+.tiptap-editor-content ul,
+.tiptap-content ul {
+  @apply list-disc pl-5 mb-3;
+}
+
+.tiptap-editor-content ol,
+.tiptap-content ol {
+  @apply list-decimal pl-5 mb-3;
+}
+
+.tiptap-editor-content li,
+.tiptap-content li {
+  @apply mb-1;
+}
+
+.tiptap-editor-content li p,
+.tiptap-content li p {
+  @apply mb-0;
+}
+
+/* Toolbar styling */
+.tiptap-toolbar {
+  @apply border-b border-border;
+}
+
+/* ========================================
+   Parameter Slider Styles
+   ======================================== */
+
+/* Gradient slider track (red → yellow → green) */
+.gradient-slider-track {
+  background: linear-gradient(to right, #ef4444, #eab308, #22c55e);
+  height: 10px;
+  border-radius: 5px;
+  position: relative;
+  cursor: pointer;
+}
+
+/* Prevent text selection while dragging sliders */
+.gradient-slider-track,
+.gradient-slider-track * {
+  user-select: none;
+}
+
+/* ========================================
+   Auth Pages Styles
+   ======================================== */
+
+/* Respect user's motion preferences - disable animations if requested */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Auth layout - prevent layout shift */
+.auth-layout-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ========================================
+   Node Details Panel Styles
+   ======================================== */
+
+/* Fade-in animation for node content */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.node-content-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Right sidebar scrollbar styling */
+.node-details-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--gold) / 0.3) transparent;
+}
+
+.node-details-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.node-details-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.node-details-scrollbar::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--gold) / 0.3);
+  border-radius: 3px;
+}
+
+.node-details-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--gold) / 0.5);
 }

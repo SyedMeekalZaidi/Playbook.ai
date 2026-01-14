@@ -7,11 +7,14 @@ export function createClient() {
   );
 }
 
+// Singleton client instance for client-side use
+export const supabase = createClient();
+
 // Debug helper function to check auth state (client-side only)
 export async function getAuthDebugInfo() {
-  const supabase = createClient();
+  const client = createClient();
   try {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const { data: userData, error: userError } = await client.auth.getUser();
     return {
       hasUser: !!userData.user,
       userError: userError?.message || null,

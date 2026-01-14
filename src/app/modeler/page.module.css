@@ -48,10 +48,9 @@
 
 .modelerWrapper {
   flex-grow: 1;
-  border: 1px solid #ccc;
   background-color: #fff;
-  position: relative; /* For bpmn-js container */
-  min-height: 0; /* Ensure flex-grow works, remove fixed min-height */
+  position: relative;
+  min-height: 0;
 }
 
 .modelerContainer { /* Increase from 600px to 800px */
@@ -361,50 +360,93 @@
 }
 
 .modelerPageContainer {
-  padding-top: 70px; /* Adjusted for fixed navbar height */
+  padding-top: 0;
   padding-bottom: 1rem;
-  height: calc(100vh - 70px); /* Adjusted for fixed navbar height */
+  height: calc(100vh - 4rem); /* Account for navbar height variable */
   display: flex;
   flex-direction: column;
+  background-color: hsl(40 20% 97%); /* bg-background warm gray */
 }
 
 .modelerLayoutRow {
-  flex-grow: 1; /* Allow row to take available space */
-  display: flex; /* Use flex for columns */
-  min-height: 0; /* Prevent flex items from overflowing */
+  flex-grow: 1;
+  display: flex;
+  min-height: 0;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.sidebarColumn {
+  width: 280px;
+  min-width: 280px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background-color: hsl(40 14% 95%); /* bg-surface-muted */
+  border-radius: 0.625rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.mainContentColumn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .modelerColumn {
   display: flex;
   flex-direction: column;
-  flex-grow: 1; /* Allow this column to grow */
-  min-height: 0; /* Necessary for flex children in some cases */
-  padding: 0.5rem;
+  flex-grow: 1;
+  min-height: 0;
+  background-color: #fff;
+  border-radius: 0.625rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
 }
 
 .debugColumn {
   display: flex;
   flex-direction: column;
-  height: 100%; /* Full height of the row */
-  padding: 0.5rem;
-  overflow-y: auto; /* Allow debug panel to scroll */
-  background-color: #f8f9fa;
-  border-left: 1px solid #dee2e6;
+  min-width: 300px;
+  overflow-y: auto;
+  background-color: #fff;
+  border-radius: 0.625rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-left: 0.5rem;
+}
+
+/* Right Sidebar - Node Details Panel */
+.rightSidebarColumn {
+  width: 360px;
+  min-width: 360px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: hsl(40 14% 95%); /* bg-surface-muted */
+  border-radius: 0.625rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.rightSidebarColumn .panelContent {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .modelerHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
-  padding: 0.5rem;
+  padding: 0.75rem 1rem;
   background-color: #fff;
-  border-bottom: 1px solid #dee2e6;
+  border-bottom: 1px solid hsl(40 10% 90%); /* border-border */
 }
 
 .modelerHeader h3 {
-  margin-bottom: 0;
-  color: #14213D;
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #14213D; /* oxford-blue */
 }
 
 .modelerLoading {
@@ -414,6 +456,37 @@
   height: 100%;
   font-size: 1.2rem;
   color: #6c757d;
+}
+
+/* Saving overlay - subtle skeleton-style shimmer during save/switch */
+.savingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(248, 247, 245, 0.7) 0%,
+    rgba(248, 247, 245, 0.8) 30%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(248, 247, 245, 0.8) 70%,
+    rgba(248, 247, 245, 0.7) 100%
+  );
+  background-size: 200% 100%;
+  animation: overlayShimmer 2.5s ease-in-out infinite;
+  z-index: 100;
+  backdrop-filter: blur(1px);
+  pointer-events: all; /* Block interactions */
+}
+
+@keyframes overlayShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .stickyError {

@@ -1,8 +1,36 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Modal, Button, Form, Tab, Tabs, Spinner, Alert, Nav } from 'react-bootstrap';
+/**
+ * ModalComponents.tsx
+ * Fixed-size modals for the BPMN modeler
+ * Uses standardized sizes: sm (400px), md (560px)
+ */
+
+import React from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogBody,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Playbook, Process } from './interfaces';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 interface ModalComponentsProps {
   isClient: boolean;
@@ -29,20 +57,6 @@ interface ModalComponentsProps {
   processNameForDelete: string;
 }
 
-const ClientOnlyModal = ({ children, ...props }: React.ComponentProps<typeof Modal>) => {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  if (!isMounted) {
-    return null;
-  }
-
-  return <Modal {...props}>{children}</Modal>;
-};
-
 export const ModalComponents: React.FC<ModalComponentsProps> = ({
   isClient,
   showNameDialog,
@@ -67,135 +81,195 @@ export const ModalComponents: React.FC<ModalComponentsProps> = ({
   handleDeleteProcess,
   processNameForDelete,
 }) => {
+  if (!isClient) return null;
+
   return (
     <>
-      {isClient && (
-        <ClientOnlyModal 
-          show={showNameDialog} 
-          onHide={() => setShowNameDialog(false)} 
-          backdrop="static" 
-          keyboard={false}
-          centered
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Process Modeler Setup</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      {/* Process Setup Dialog - Size: md (560px) */}
+      <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle className="text-oxford-blue">
+              Process Modeler Setup
+            </DialogTitle>
+            <DialogDescription>
+              Select a playbook and create a new process or load an existing one.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogBody>
             {isLoadingPlaybooks ? (
-              <div className="text-center"><Spinner animation="border" /> Loading Playbooks...</div>
-            ) : playbooks.length === 0 && !isLoadingPlaybooks ? (
-                <Alert variant="warning">
-                  No playbooks found. Please <Alert.Link href="/playbooks/new-playbook">create a playbook</Alert.Link> first.
-                </Alert>
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-3/4" />
+              </div>
+            ) : playbooks.length === 0 ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  No playbooks found. Please{' '}
+                  <a href="/dashboard" className="font-medium underline">
+                    create a playbook
+                  </a>{' '}
+                  first.
+                </AlertDescription>
+              </Alert>
             ) : (
-              <>
-                <Form.Group className="mb-3">
-                  <Form.Label>Select Playbook</Form.Label>
-                  <Form.Control
-                    as="select"
+              <div className="space-y-6">
+                {/* Playbook Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="playbook-select">Select Playbook</Label>
+                  <Select
                     value={playbookId}
-                    onChange={(e) => setPlaybookId(e.target.value)}
-                    disabled={isLoadingPlaybooks || playbooks.length === 0}
+                    onValueChange={setPlaybookId}
+                    disabled={isLoadingPlaybooks}
                   >
-                    <option value="">-- Select a Playbook --</option>
-                    {playbooks.map((pb) => (
-                      <option key={pb.id} value={pb.id}>{pb.name}</option>
-                    ))}
-                  </Form.Control>
-                </Form.Group>
+                    <SelectTrigger id="playbook-select">
+                      <SelectValue placeholder="-- Select a Playbook --" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {playbooks.map((pb) => (
+                        <SelectItem key={pb.id} value={pb.id}>
+                          {pb.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
+                {/* Tabs for New/Load Process */}
                 {playbookId && (
-                  <Nav variant="tabs" activeKey={activeTab} onSelect={(k) => setActiveTab(k || 'new')}>
-                    <Nav.Item>
-                      <Nav.Link eventKey="new">Create New Process</Nav.Link>
-                    </Nav.Item>
-                    <Nav.Item>
-                      <Nav.Link eventKey="load">Load Existing Process</Nav.Link>
-                    </Nav.Item>
-                  </Nav>
-                )}
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="new">Create New</TabsTrigger>
+                      <TabsTrigger value="load">Load Existing</TabsTrigger>
+                    </TabsList>
 
-                {playbookId && activeTab === 'new' && (
-                  <div className="mt-3">
-                    <Form.Group className="mb-3">
-                      <Form.Label>New Process Name</Form.Label>
-                      <Form.Control
-                        type="text"
-                        placeholder="Enter name for the new process"
-                        value={processName}
-                        onChange={(e) => setProcessName(e.target.value)}
-                      />
-                    </Form.Group>
-                    <Button 
-                      variant="primary" 
-                      onClick={handleStartNewDiagram} 
-                      disabled={isLoading || !processName.trim() || !playbookId}
-                    >
-                      {isLoading ? <Spinner as="span" animation="border" size="sm" /> : "Start Modeling"}
-                    </Button>
-                  </div>
-                )}
+                    {/* New Process Tab */}
+                    <TabsContent value="new" className="space-y-4 pt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="process-name">Process Name</Label>
+                        <Input
+                          id="process-name"
+                          type="text"
+                          placeholder="Enter name for the new process"
+                          value={processName}
+                          onChange={(e) => setProcessName(e.target.value)}
+                        />
+                      </div>
+                      <Button
+                        onClick={handleStartNewDiagram}
+                        disabled={isLoading || !processName.trim() || !playbookId}
+                        className="w-full bg-oxford-blue hover:bg-oxford-blue/90"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          'Start Modeling'
+                        )}
+                      </Button>
+                    </TabsContent>
 
-                {playbookId && activeTab === 'load' && (
-                  <div className="mt-3">
-                    {isLoadingProcesses ? (
-                      <div className="text-center"><Spinner animation="border" /> Loading Processes...</div>
-                    ) : playbookProcesses.length === 0 ? (
-                       <Alert variant="info">No existing processes in this playbook. Create a new one!</Alert>
-                    ) : (
-                      <>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Select Existing Process</Form.Label>
-                          <Form.Control
-                            as="select"
-                            value={selectedExistingProcess}
-                            onChange={(e) => setSelectedExistingProcess(e.target.value)}
+                    {/* Load Existing Tab */}
+                    <TabsContent value="load" className="space-y-4 pt-4">
+                      {isLoadingProcesses ? (
+                        <div className="space-y-3">
+                          <Skeleton className="h-10 w-full" />
+                          <Skeleton className="h-10 w-full" />
+                        </div>
+                      ) : playbookProcesses.length === 0 ? (
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            No existing processes in this playbook. Create a new one!
+                          </AlertDescription>
+                        </Alert>
+                      ) : (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="existing-process">Select Process</Label>
+                            <Select
+                              value={selectedExistingProcess}
+                              onValueChange={setSelectedExistingProcess}
+                            >
+                              <SelectTrigger id="existing-process">
+                                <SelectValue placeholder="-- Select a Process --" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {playbookProcesses.map((proc) => (
+                                  <SelectItem key={proc.id} value={proc.id}>
+                                    {proc.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button
+                            onClick={handleLoadExistingProcess}
+                            disabled={isLoading || !selectedExistingProcess}
+                            className="w-full bg-oxford-blue hover:bg-oxford-blue/90"
                           >
-                            <option value="">-- Select a Process --</option>
-                            {playbookProcesses.map((proc) => (
-                              <option key={proc.id} value={proc.id}>{proc.name}</option>
-                            ))}
-                          </Form.Control>
-                        </Form.Group>
-                        <Button 
-                          variant="primary" 
-                          onClick={handleLoadExistingProcess} 
-                          disabled={isLoading || !selectedExistingProcess}
-                        >
-                          {isLoading ? <Spinner as="span" animation="border" size="sm" /> : "Load Process"}
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                            {isLoading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Loading...
+                              </>
+                            ) : (
+                              'Load Process'
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </TabsContent>
+                  </Tabs>
                 )}
-              </>
+              </div>
             )}
-          </Modal.Body>
-        </ClientOnlyModal>
-      )}
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
 
-      {isClient && (
-        <ClientOnlyModal
-          show={showDeleteConfirm}
-          onHide={() => setShowDeleteConfirm(false)}
-          centered
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Confirm Deletion</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            Are you sure you want to delete the process "<strong>{processNameForDelete}</strong>"? This action cannot be undone.
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
+      {/* Delete Confirmation Dialog - Size: sm (400px) */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              Confirm Deletion
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the process{' '}
+              <span className="font-semibold text-foreground">"{processNameForDelete}"</span>?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+            >
               Cancel
             </Button>
-            <Button variant="danger" onClick={handleDeleteProcess} disabled={isLoading}>
-              {isLoading ? <Spinner as="span" animation="border" size="sm" /> : "Delete Process"}
+            <Button
+              variant="destructive"
+              onClick={handleDeleteProcess}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Process'
+              )}
             </Button>
-          </Modal.Footer>
-        </ClientOnlyModal>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

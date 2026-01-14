@@ -1,31 +1,24 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+/**
+ * ProcessTreeContext - State management for sidebar process list
+ * Provides processes for the selected playbook with smart caching
+ */
+
+import React, { createContext, useState, useContext, useCallback, useRef } from 'react';
 
 interface Process {
   id: string;
   name: string;
   parentId: string | null;
-  nodes: Node[];
-  subProcesses?: Process[];
-}
-
-interface Node {
-  id: string;
-  name: string;
-  type: string;
-  processId: string;
 }
 
 interface ProcessTreeContextType {
   processes: Process[];
-  nodes: Node[];
   loading: boolean;
   error: string | null;
-  activeItemId: string | null;
-  expandedProcesses: Set<string>;
-  fetchTreeData: (playbookId: string) => Promise<void>;
-  setActiveItem: (id: string | null) => void;
-  toggleProcessExpand: (processId: string) => void;
-  setExpandedProcesses: React.Dispatch<React.SetStateAction<Set<string>>>;
+  activeProcessId: string | null;
+  currentPlaybookId: string | null;
+  fetchProcesses: (playbookId: string, forceRefresh?: boolean) => Promise<void>;
+  setActiveProcess: (id: string | null) => void;
 }
 
 const ProcessTreeContext = createContext<ProcessTreeContextType | undefined>(undefined);
@@ -40,97 +33,74 @@ export const useProcessTree = () => {
 
 export const ProcessTreeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [processes, setProcesses] = useState<Process[]>([]);
-  const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeItemId, setActiveItemId] = useState<string | null>(null);
-  const [expandedProcesses, setExpandedProcesses] = useState<Set<string>>(new Set());
+  const [activeProcessId, setActiveProcessId] = useState<string | null>(null);
+  const [currentPlaybookId, setCurrentPlaybookId] = useState<string | null>(null);
+  
+  // Track in-flight request to prevent duplicate fetches
+  const fetchingRef = useRef<string | null>(null);
 
-  const fetchTreeData = useCallback(async (playbookId: string) => {
+  const fetchProcesses = useCallback(async (playbookId: string, forceRefresh = false) => {
+    // Skip if no playbookId
     if (!playbookId) {
       setProcesses([]);
-      setNodes([]);
-      setLoading(false);
+      setCurrentPlaybookId(null);
       return;
     }
     
+    // Skip if already have data for this playbook (unless forced)
+    if (!forceRefresh && playbookId === currentPlaybookId && processes.length > 0) {
+      return;
+    }
+    
+    // Skip if already fetching this playbook
+    if (fetchingRef.current === playbookId) {
+      return;
+    }
+    
+    fetchingRef.current = playbookId;
     setLoading(true);
     setError(null);
     
     try {
-      // Fetch processes for this playbook
-      const processResponse = await fetch(`/api/playbooks/${playbookId}/processes`);
+      const response = await fetch(`/api/playbooks/${playbookId}/processes`);
       
-      if (!processResponse.ok) {
-        throw new Error(`Failed to fetch processes: ${processResponse.status}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch processes: ${response.status}`);
       }
       
-      const processData = await processResponse.json();
+      const processData = await response.json();
       
-      // Fetch nodes for this playbook
-      const nodeResponse = await fetch(`/api/playbooks/${playbookId}/nodes`);
-      
-      if (!nodeResponse.ok) {
-        throw new Error(`Failed to fetch nodes: ${nodeResponse.status}`);
+      // Only update if this is still the relevant fetch
+      if (fetchingRef.current === playbookId) {
+        setProcesses(processData);
+        setCurrentPlaybookId(playbookId);
       }
-      
-      const nodeData = await nodeResponse.json();
-      
-      setProcesses(processData);
-      setNodes(nodeData);
-      
-      // Removed: Automatically expand the first process if none are expanded
-      // if (processData.length > 0 && expandedProcesses.size === 0) {
-      //   setExpandedProcesses(new Set([processData[0].id]));
-      // }
     } catch (err) {
-      console.error('Error fetching data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load process hierarchy');
+      console.error('[ProcessTreeContext] Error fetching processes:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load processes');
     } finally {
-      setLoading(false);
-    }
-  }, []); // Removed expandedProcesses.size from dependencies
-
-  const setActiveItem = useCallback((id: string | null) => {
-    setActiveItemId(id);
-    
-    // If setting a node as active, ensure its parent process is expanded
-    if (id) {
-      const node = nodes.find(n => n.id === id);
-      if (node) {
-        setExpandedProcesses(prev => {
-          const newSet = new Set(prev);
-          newSet.add(node.processId);
-          return newSet;
-        });
+      if (fetchingRef.current === playbookId) {
+        setLoading(false);
+        fetchingRef.current = null;
       }
     }
-  }, [nodes]);
+  }, [currentPlaybookId, processes.length]);
 
-  const toggleProcessExpand = useCallback((processId: string) => {
-    setExpandedProcesses(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(processId)) {
-        newSet.delete(processId);
-      } else {
-        newSet.add(processId);
-      }
-      return newSet;
-    });
+  const setActiveProcess = useCallback((id: string | null) => {
+    setActiveProcessId(id);
   }, []);
 
   return (
     <ProcessTreeContext.Provider value={{
       processes,
-      nodes,
       loading,
       error,
-      activeItemId,
-      expandedProcesses,
-      fetchTreeData,
-      setActiveItem,
-      toggleProcessExpand,
-      setExpandedProcesses
+      activeProcessId,
+      currentPlaybookId,
+      fetchProcesses,
+      setActiveProcess,
     }}>
       {children}
     </ProcessTreeContext.Provider>
