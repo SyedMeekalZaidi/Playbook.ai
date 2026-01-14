@@ -39,7 +39,7 @@
     "fast-xml-parser": "^5.3.3",
     "framer-motion": "^11.18.2",
     "lucide-react": "^0.562.0",
-    "next": "^15.2.1",
+    "next": "15.2.8",
     "next-auth": "^4.24.11",
     "openai": "^6.16.0",
     "react": "^19.0.0",
